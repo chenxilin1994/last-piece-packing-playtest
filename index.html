@@ -5,14 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f0df">
   <title>最后一件装得下吗</title>
-  <link rel="stylesheet" href="./styles.css">
-  <script type="module" src="./game.mjs"></script>
+  <link rel="stylesheet" href="./styles.css?v=camping-1">
+  <script type="module" src="./game.mjs?v=camping-1"></script>
 </head>
 <body>
+  <div class="camp-landscape" aria-hidden="true">
+    <span class="camp-sun"></span>
+    <span class="camp-ridge ridge-distant"></span>
+    <span class="camp-ridge ridge-near"></span>
+    <span class="camp-trees trees-left"></span>
+    <span class="camp-trees trees-right"></span>
+  </div>
   <main class="game">
     <header class="game-header">
       <span class="package-mark" aria-hidden="true"><i></i></span>
       <h1>最后一件装得下吗<span aria-hidden="true">？</span></h1>
+      <button type="button" id="camp-sound" aria-pressed="false">
+        <span class="sound-icon" aria-hidden="true"></span><span data-camp-sound-label>声音</span>
+      </button>
     </header>
 
     <nav id="level-nav" class="level-nav" aria-label="选择关卡"></nav>
@@ -38,6 +48,10 @@
             <div id="placed"></div>
           </div>
           <div class="door-indicator">车门</div>
+          <div id="camp-hatch" aria-hidden="true">
+            <div class="hatch-window"></div>
+            <div class="hatch-handle"></div>
+          </div>
         </div>
         <div class="load-bed-tail" aria-hidden="true"><i></i><i></i></div>
       </section>

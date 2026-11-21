@@ -198,9 +198,8 @@ h1, h2, p { margin: 0; }
   overflow: hidden;
 }
 #placed { overflow: hidden; pointer-events: none; }
-#placed .crate:not(.is-ghost):not(.is-dragging) { pointer-events: none; }
-#placed .crate:not(.is-ghost):not(.is-dragging) .cargo-cell { pointer-events: auto; touch-action: none; }
-#placed .crate.preview .cargo-cell { pointer-events: none; }
+#placed .crate { pointer-events: none; }
+#placed .crate[data-x]:not(.is-ghost) .cargo-cell { pointer-events: auto; touch-action: none; }
 .cell {
   position: relative;
   min-width: 0;
@@ -545,4 +544,397 @@ h1, h2, p { margin: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; }
+}
+
+/* The camping route has its own palette and scenery. Grid geometry is shared. */
+.camp-landscape, #camp-hatch, #camp-sound { display: none; }
+
+body.is-camping {
+  --paper: #eee7d2;
+  --white: #fff8e6;
+  --ink: #244537;
+  --muted: #4b6253;
+  --orange: #eebb67;
+  --line: #a8ab88;
+  --focus: #93421e;
+  position: relative;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 51% 0, #fff6dd 0%, transparent 54%), var(--paper);
+}
+
+.is-camping .game { position: relative; }
+.is-camping .camp-landscape {
+  display: block;
+  position: absolute;
+  inset: 0 0 auto;
+  height: min(690px, 100%);
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(#f3e3b9, #f7eed1 47%, #c8cba7 82%, transparent);
+  mask-image: linear-gradient(#000 60%, transparent);
+}
+.camp-sun {
+  position: absolute;
+  width: clamp(64px, 12vw, 170px);
+  aspect-ratio: 1;
+  top: clamp(28px, 8vw, 106px);
+  right: 12%;
+  border-radius: 50%;
+  background: #edc776;
+  box-shadow: 0 0 30px #efd5a5bd;
+  opacity: .65;
+}
+.camp-ridge {
+  position: absolute;
+  inset: 0;
+  background: #8b9e7faf;
+}
+.ridge-distant {
+  clip-path: polygon(0 40%, 14% 21%, 19% 28%, 34% 16%, 48% 33%, 62% 24%, 69% 32%, 80% 21%, 94% 31%, 100% 25%, 100% 97%, 0 97%);
+}
+.ridge-near {
+  background: linear-gradient(#9fac80, #748664 75%, #a6ab80);
+  opacity: .62;
+  clip-path: polygon(0 48%, 9% 37%, 20% 45%, 27% 35%, 42% 51%, 56% 41%, 64% 43%, 76% 33%, 85% 40%, 100% 39%, 100% 98%, 0 98%);
+}
+.camp-trees {
+  position: absolute;
+  width: clamp(44px, 15vw, 195px);
+  height: 76%;
+  bottom: 5%;
+  background: linear-gradient(#547352, #84946b);
+  opacity: .56;
+  clip-path: polygon(0 100%,0 52%,11% 34%,4% 35%,20% 14%,33% 36%,27% 35%,41% 59%,35% 59%,51% 76%,47% 65%,54% 51%,49% 51%,65% 22%,78% 52%,72% 52%,84% 67%,78% 66%,96% 86%,93% 100%);
+}
+.trees-left { left: 0; }
+.trees-right { right: 0; transform: scaleX(-1); height: 68%; opacity: .48; }
+
+.is-camping .game-header { gap: 8px; }
+.is-camping .game-header h1 {
+  font-family: "Songti SC", "Noto Serif CJK SC", STSong, PMingLiU, serif;
+  font-size: clamp(19px, 5.7vw, 29px);
+  font-weight: 900;
+  letter-spacing: -.045em;
+  text-wrap: normal;
+}
+.is-camping .game-header h1 span { color: #9b4b29; }
+.is-camping .package-mark {
+  border: 1px solid #244537;
+  background: #49684d;
+  box-shadow: 0 2px 0 #263e33;
+}
+.is-camping .package-mark::before {
+  inset: 5px 3px;
+  width: auto;
+  border: 0;
+  background: #faecc8;
+  clip-path: polygon(0 93%, 39% 19%, 57% 53%, 72% 32%, 100% 93%, 64% 93%, 39% 44%, 13% 93%);
+}
+.is-camping .package-mark i {
+  inset: 4px 5px auto auto;
+  width: 5px;
+  height: 5px;
+  border: 0;
+  border-radius: 50%;
+  background: #efbd6d;
+}
+
+.is-camping #camp-sound {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  gap: 5px;
+  min-width: 44px;
+  min-height: 44px;
+  margin-inline-start: auto;
+  padding: 5px 7px;
+  border: 1px solid #77816a;
+  border-radius: 9px;
+  background: #fff3d8;
+  color: #244537;
+  font-size: 12px;
+  font-weight: 750;
+  touch-action: manipulation;
+}
+.is-camping #camp-sound[aria-pressed="true"] { background: #395742; color: #fff3d8; border-color: #395742; }
+.is-camping #camp-sound:active { box-shadow: inset 0 2px 2px #152b2042; }
+.sound-icon { position: relative; display: block; width: 15px; height: 15px; flex: none; }
+.sound-icon::before {
+  content: "";
+  position: absolute;
+  inset: 2px 6px 2px 0;
+  background: currentColor;
+  clip-path: polygon(0 29%, 37% 29%, 100% 0, 100% 100%, 37% 71%, 0 71%);
+}
+.sound-icon::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 0;
+  width: 6px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-left: 0;
+  border-radius: 0 100% 100% 0;
+}
+#camp-sound[aria-pressed="false"] .sound-icon::after {
+  top: 2px;
+  right: 1px;
+  width: 1.5px;
+  height: 11px;
+  border: 0;
+  border-radius: 1px;
+  background: currentColor;
+  transform: rotate(-42deg);
+}
+
+.is-camping .level-tab {
+  background: #fff5da;
+  border-color: #9fa284;
+  box-shadow: 0 2px 0 #9ba080;
+}
+.is-camping .level-tab:is(.is-active, .active, [aria-current="true"], [aria-current="step"], [aria-selected="true"], [aria-pressed="true"]) {
+  background: #355640;
+  border-color: #264535;
+  color: #fff9e9;
+  box-shadow: 0 2px 0 #244331;
+}
+.is-camping .mission {
+  background: #fff7e3;
+  border-color: #aab091;
+  box-shadow: 0 2px 8px #4d573516;
+}
+.is-camping .mission-reference { background: #a66a39; }
+.is-camping #level-title {
+  font-family: "Songti SC", "Noto Serif CJK SC", STSong, PMingLiU, serif;
+  font-size: 18px;
+}
+.is-camping .progress { background: #e4e7ce; color: #2d4d38; }
+
+/* Rear body, rubber cargo liner and recessed lights. */
+.is-camping .load-bed {
+  position: relative;
+  padding-inline: 10px;
+  border: 1px solid #283a2d;
+  border-radius: 22px 22px 12px 12px;
+  background: linear-gradient(108deg, #465b46 0%, #779477 13%, #668269 50%, #52735a 85%, #374d3b 100%);
+  box-shadow: 0 4px 0 #344e3b, 0 5px 18px #2434264d, inset 0 1px 0 #b7c6a2;
+}
+.is-camping .load-bed-head {
+  padding-inline: 9px;
+  color: #fff7e0;
+  text-shadow: 0 1px 1px #233729;
+}
+.is-camping .load-bed-frame {
+  position: relative;
+  border-color: #26382e;
+  border-radius: 12px 12px 6px 6px;
+  background: #2c352c;
+  box-shadow: inset 0 0 0 2px #a5b696, 0 2px 0 #324638;
+}
+.is-camping #cells {
+  background: #ded0b0;
+  border-radius: 8px 8px 3px 3px;
+}
+.is-camping .cell {
+  border-right-color: #594f3c54;
+  border-bottom-color: #594f3c54;
+  background: repeating-linear-gradient(0deg, #65584411 0 1px, transparent 1px 5px), #d9cfb3;
+}
+.is-camping .cell:nth-child(2n) { background-color: #e5dbc0; }
+.is-camping .cell:is(.blocked,[data-blocked="true"]) {
+  background: repeating-linear-gradient(-45deg,#475d46 0 6px,#3a4f3b 6px 12px);
+  box-shadow: inset 0 0 0 2px #263a30;
+}
+.is-camping .cell.blocked::before {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border: 1px solid #222c28;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #364441 9%, transparent 10%),
+    radial-gradient(circle at 50% 50%, #aeb7a5 16%, #6f8277 19% 26%, #495950 27%, #26312c 33% 50%, transparent 51%),
+    repeating-conic-gradient(#1d2c28 0deg 14deg, #53625b 14deg 18deg);
+  box-shadow: 0 2px 2px #16231eb0, inset 0 0 0 2px #101b18a1;
+}
+.is-camping .cell:nth-child(5n) { border-right-color: transparent; }
+.is-camping .cell:nth-child(n+21) { border-bottom-color: transparent; }
+.is-camping .load-bed-tail {
+  position: relative;
+  align-items: center;
+  padding: 5px 1px 0;
+}
+.is-camping .load-bed-tail::before {
+  content: "";
+  position: absolute;
+  width: 32%;
+  height: 3px;
+  left: 34%;
+  bottom: 1px;
+  border: 1px solid #314437;
+  border-radius: 2px;
+  background: #a8b199;
+}
+.is-camping .load-bed-tail i {
+  width: 30px;
+  height: 5px;
+  border: 1px solid #773623;
+  background: repeating-linear-gradient(90deg, #a64124 0 2px, #d76e45 2px 6px);
+  box-shadow: inset 0 1px 0 #f2a780;
+}
+
+.is-camping .cargo {
+  background: #e5dcc0;
+  border-color: #aeb28c;
+}
+.is-camping #instruction, .is-camping #status { color: #405844; }
+.is-camping #status:is(.error,.is-error,[data-tone="error"]) { color: #8c2f22; font-weight: 750; }
+.is-camping .tray-slot {
+  background: #fcf3dc;
+  border-color: #96987e;
+  color: #2d4d38;
+}
+.is-camping .tray-slot.is-selected {
+  border-color: #49714a;
+  box-shadow: inset 0 0 0 1px #49714a;
+  background: #e4ecd3;
+}
+.is-camping .crate-preview { height: 42px; min-height: 42px; }
+.camp-tray-paint {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0 2px 3px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.crate-preview:has(.camp-tray-paint) .miniature {
+  left: auto;
+  top: auto;
+  right: 0;
+  bottom: 0;
+  transform: none;
+}
+.tray-slot:not(.is-selected) .crate-preview:has(.camp-tray-paint) .miniature { visibility: hidden; }
+.is-camping .action { background: #fcf3db; border-color: #36523c; box-shadow: 0 2px 0 #36523c; }
+.is-camping .action-primary { background: #eabd6f; }
+.is-camping .action:disabled { background: #e6e3ca; color: #646d56; border-color: #9ca385; box-shadow: none; }
+.is-camping .action:active:not(:disabled) { box-shadow: none; background: #e7d3a6; }
+.is-camping .win { background: #fff3d8; }
+
+/* Object edges follow only occupied tiles. Artwork never changes hit testing. */
+.crate.camping-crate .cargo-cell {
+  background: color-mix(in srgb,var(--cargo) 60%,#d8cdb2);
+  box-shadow: none;
+}
+.crate.camping-crate:not(.preview) .cargo-cell {
+  border-style: solid;
+  border-color: var(--cargo-dark);
+}
+.crate.camping-crate .cargo-cell::before,
+.crate.camping-crate .cargo-cell::after { display: none; }
+.crate.camping-crate.is-dragging .cargo-cell {
+  border-style: dashed;
+  background: color-mix(in srgb,var(--cargo) 23%,transparent);
+}
+.crate.camping-crate.is-dragging {
+  filter: drop-shadow(0 3px 3px #102d2a47);
+  transform: translateY(-7px);
+}
+.crate.camping-crate .cargo-art,
+.crate.camping-crate .cargo-art-plane,
+.crate.camping-crate .cargo-art-clip {
+  position: absolute;
+  pointer-events: none;
+}
+.cargo-art-clip { inset: 0; }
+.cargo-art-plane { left: 50%; top: 50%; }
+.cargo-art { display: block; object-fit: contain; }
+.crate.camping-crate.is-selected { filter: drop-shadow(0 0 1.5px #17391c); }
+.crate.camping-crate.preview { opacity: .85; }
+.crate.camping-crate.preview .cargo-art,
+.crate.camping-crate.preview .cargo-art-plane { display: none; }
+.crate.camping-crate.preview .cargo-cell {
+  background: #b8d6948f;
+  box-shadow: inset 0 0 0 2px #36572c;
+}
+.crate.camping-crate.preview.is-invalid .cargo-cell {
+  background: repeating-linear-gradient(-45deg, #b63f32d4 0 4px, #f0ac84bd 4px 8px);
+  box-shadow: inset 0 0 0 2px #8e3226;
+}
+.camp-anchor {
+  position: absolute;
+  z-index: 3;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff8d8;
+  border-radius: 50%;
+  background: #214834;
+  outline: 1px solid #26442b;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.miniature .camp-anchor { width: 6px; height: 6px; border-width: 1px; }
+.crate.camping-crate.preview.is-invalid .camp-anchor { background: #8e3226; }
+
+/* The layer uses the frame padding edge to match the square board. */
+.is-camping #camp-hatch {
+  display: block;
+  position: absolute;
+  inset: 4px;
+  z-index: 6;
+  overflow: hidden;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  border: 2px solid #2d4435;
+  border-radius: 9px 9px 5px 5px;
+  background: linear-gradient(158deg, #a6bda1, #72967b 48%, #4f6f57);
+  box-shadow: inset 0 2px 0 #d9e1bc, inset 0 -3px 0 #3d5c46;
+  transform-origin: top center;
+}
+.is-camping.is-closing #camp-hatch {
+  visibility: visible;
+  animation: camp-close-liftgate 620ms cubic-bezier(.22,.65,.24,1) both;
+}
+.hatch-window {
+  position: absolute;
+  inset: 6% 8% 39%;
+  border: 3px solid #263e34;
+  border-radius: 12% 12% 9% 9%;
+  background: linear-gradient(146deg, #759b8d66 30%, #acc2acaa 31% 38%, transparent 39%),
+    linear-gradient(#385b50, #26483d);
+  box-shadow: 0 2px 0 #96a894;
+}
+.hatch-handle {
+  position: absolute;
+  width: 22%;
+  height: 4%;
+  left: 39%;
+  top: 69%;
+  border: 1px solid #304b37;
+  border-radius: 4px;
+  background: #374a3b;
+  box-shadow: 0 1px 0 #a7b59c;
+}
+@keyframes camp-close-liftgate {
+  0% { opacity: 0; transform: perspective(600px) rotateX(83deg); }
+  12% { opacity: 1; }
+  86% { opacity: 1; transform: perspective(600px) rotateX(-2deg); }
+  100% { opacity: 1; transform: perspective(600px) rotateX(0); }
+}
+
+@media (max-width: 340px) {
+  .is-camping .game-header { gap: 6px; }
+  .is-camping .game-header h1 { font-size: 19px; }
+  .is-camping #camp-sound { padding-inline: 5px; gap: 4px; }
+}
+@media (min-width: 700px) {
+  .is-camping .game-header h1 { font-size: 38px; }
+  .is-camping #camp-sound { padding-inline: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-camping.is-closing #camp-hatch { animation-duration: 0.01ms; }
 }

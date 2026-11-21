@@ -1,4 +1,6 @@
-import { LEVELS } from './levels.mjs';
+import { cargoIllustration, trayIllustration } from './camping-art.mjs';
+import { createCampingAudio } from './camping-audio.mjs';
+import { LEVELS } from './levels.mjs?v=camping-1';
 import { SIZE, placementError, shape } from './packing.mjs';
 
 const element = (id) => document.getElementById(id);
@@ -7,6 +9,9 @@ const placed = element('placed');
 const tray = element('tray');
 const win = element('win');
 const status = element('status');
+const campHatch = element('camp-hatch');
+const campAudio = createCampingAudio(element('camp-sound'));
+const CAMPING_LEVEL = 2;
 const boardKeys = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
 function freshRound(level) {
@@ -18,9 +23,14 @@ function freshRound(level) {
 }
 
 const rounds = LEVELS.map(freshRound);
-let levelIndex = 0;
+const requestedLevel = Number(new URLSearchParams(location.search).get('level'));
+let levelIndex = Number.isInteger(requestedLevel) && requestedLevel >= 1 && requestedLevel <= LEVELS.length
+  ? requestedLevel - 1 : 0;
 let drag = null;
+let tapPreview = null;
+let winTimer = null;
 let cursor = { x: 0, y: 0 };
+const isCamping = () => levelIndex === CAMPING_LEVEL;
 const current = () => rounds[levelIndex];
 const level = () => LEVELS[levelIndex];
 const pieceById = (id) => level().pieces.find((piece) => piece.id === id);
@@ -33,9 +43,17 @@ function make(tag, className = '') {
   return node;
 }
 
+function setStatus(message = '', tone = '') {
+  status.textContent = message;
+  status.dataset.tone = tone;
+}
+
 function drawCrate(piece, rotation, unit, className = '') {
   const geometry = shape(piece.cells, rotation);
   const crate = make('div', `crate ${piece.color} ${className}`);
+  const camping = isCamping();
+  const preview = crate.classList.contains('preview');
+  if (camping) crate.classList.add('camping-crate');
   crate.dataset.piece = piece.id;
   crate.dataset.rotation = rotation;
   crate.style.width = `${geometry.width * unit}px`;
@@ -55,9 +73,22 @@ function drawCrate(piece, rotation, unit, className = '') {
     const radius = `${Math.max(2, Math.min(9, unit * 0.16))}px`;
     tile.style.borderRadius = [!left && !above, !right && !above, !right && !below, !left && !below]
       .map((corner) => corner ? radius : '0').join(' ');
+    if (camping && !preview) {
+      tile.style.borderWidth = [above, right, below, left].map((joined) => joined ? '0' : '1px').join(' ');
+    }
     crate.append(tile);
   }
   if (piece.door) crate.firstElementChild.classList.add('express');
+  if (camping && !preview && !crate.classList.contains('miniature')) {
+    crate.append(cargoIllustration(piece, rotation, unit, geometry));
+  }
+  if (camping && (crate.classList.contains('is-selected') || preview)) {
+    const [[x, y]] = geometry.cells;
+    const anchor = make('span', 'camp-anchor');
+    anchor.style.left = `${(x + 0.5) * unit}px`;
+    anchor.style.top = `${(y + 0.5) * unit}px`;
+    crate.append(anchor);
+  }
   return crate;
 }
 
@@ -90,6 +121,7 @@ function renderBoard() {
 function renderPieces() {
   const { states, selected } = current();
   const unit = cellSize();
+  tapPreview = null;
   placed.replaceChildren();
   tray.replaceChildren();
   for (const piece of level().pieces) {
@@ -102,7 +134,10 @@ function renderPieces() {
     slot.setAttribute('aria-pressed', selectedHere);
     slot.setAttribute('aria-label', `${piece.name}${onBoard ? '，已装入' : ''}${piece.door ? '，先送的货' : ''}`);
     const preview = make('span', 'crate-preview');
-    const miniature = drawCrate(piece, state.rotation, 11, 'miniature');
+    const camping = isCamping();
+    if (camping) preview.append(trayIllustration(piece.id, state.rotation));
+    const miniature = drawCrate(piece, state.rotation, camping ? 7 : 11,
+      camping && selectedHere ? 'miniature is-selected' : 'miniature');
     preview.append(miniature);
     const name = make('span', 'piece-name');
     name.textContent = piece.name;
@@ -131,6 +166,8 @@ function renderCursor() {
 }
 
 function renderLevel() {
+  document.body.classList.toggle('is-camping', isCamping());
+  campAudio.setActive(isCamping());
   element('level-title').textContent = level().name;
   element('objective').textContent = level().objective;
   element('instruction').textContent = level().instruction;
@@ -148,12 +185,33 @@ function renderLevel() {
 
 function goTo(index) {
   if (drag) releaseDrag();
+  clearTimeout(winTimer);
+  winTimer = null;
+  document.body.classList.remove('is-closing');
   if (win.open) win.close();
   levelIndex = index;
   cursor = { x: 0, y: 0 };
-  status.textContent = '';
+  setStatus();
   renderLevel();
   if (loadedCount(current()) === level().pieces.length) showWin();
+}
+
+function finishClosing() {
+  if (winTimer === null) return;
+  clearTimeout(winTimer);
+  winTimer = null;
+  campAudio.play('win');
+  showWin();
+}
+
+function completeRound() {
+  if (!isCamping()) {
+    showWin();
+    return;
+  }
+  document.body.classList.add('is-closing');
+  campAudio.play('hatch');
+  winTimer = setTimeout(finishClosing, 700);
 }
 
 function showWin() {
@@ -174,11 +232,11 @@ function showWin() {
 
 function select(id) {
   current().selected = id;
-  status.textContent = '';
+  setStatus();
   renderPieces();
 }
 
-function commit(id, placement) {
+function commit(id, placement, effect = 'place') {
   const round = current();
   const before = round.states[id];
   if (before.x === placement.x && before.y === placement.y && before.rotation === placement.rotation) {
@@ -189,45 +247,49 @@ function commit(id, placement) {
   round.history.push({ id, before });
   round.states[id] = placement;
   round.selected = id;
-  status.textContent = '';
+  setStatus();
   renderPieces();
+  campAudio.play(effect);
   const solved = loadedCount(round) === level().pieces.length;
   element('level-nav').children[levelIndex].classList.toggle('is-complete', solved);
-  if (solved && !wasSolved) showWin();
+  if (solved && !wasSolved) completeRound();
 }
 
-function tryPlacement(piece, candidate) {
+function tryPlacement(piece, candidate, effect) {
   const error = placementError(level(), current().states, piece, candidate);
   if (error) {
-    status.textContent = error;
+    setStatus(error, 'error');
+    campAudio.play('reject');
     return false;
   }
-  commit(piece.id, candidate);
+  commit(piece.id, candidate, effect);
   return true;
 }
 
 function rotate() {
   const id = current().selected;
-  if (!id || drag) return;
+  if (!id || drag || winTimer !== null) return;
   const before = current().states[id];
   const placement = { ...before, rotation: (before.rotation + 1) % 4 };
-  if (before.x === null) commit(id, placement);
-  else tryPlacement(pieceById(id), placement);
+  if (before.x === null) commit(id, placement, 'rotate');
+  else tryPlacement(pieceById(id), placement, 'rotate');
 }
 
 function undo() {
   const round = current();
-  if (drag || !round.history.length) return;
+  if (drag || winTimer !== null || !round.history.length) return;
   const { id, before } = round.history.pop();
   round.states[id] = before;
   round.selected = id;
-  status.textContent = '已撤回上一步。';
+  setStatus('已撤回上一步。');
+  campAudio.play('undo');
   renderPieces();
   element('level-nav').children[levelIndex].classList.toggle('is-complete', loadedCount(round) === level().pieces.length);
 }
 
 function restart() {
   if (drag) return;
+  campAudio.play('reset');
   rounds[levelIndex] = freshRound(level());
   goTo(levelIndex);
 }
@@ -244,12 +306,14 @@ function candidateAt(event, action) {
 }
 
 function startDrag(event) {
-  if (drag || !event.isPrimary || event.button !== 0) return;
+  if (drag || winTimer !== null || !event.isPrimary || event.button !== 0) return;
   const source = event.target.closest('[data-piece]');
   if (!source) return;
   const id = source.dataset.piece;
   const piece = pieceById(id);
   if (!piece) return;
+  clearTapPreview();
+  campAudio.play('pick');
   const state = current().states[id];
   const onBoard = placed.contains(source);
   const geometry = shape(piece.cells, state.rotation);
@@ -267,6 +331,16 @@ function startDrag(event) {
     moved: false,
   };
   source.setPointerCapture(event.pointerId);
+}
+
+function drawDropPreview(piece, candidate, unit) {
+  const error = placementError(level(), current().states, piece, candidate);
+  const preview = drawCrate(piece, candidate.rotation, unit, `preview${error ? ' is-invalid' : ''}`);
+  preview.style.left = `${candidate.x * unit}px`;
+  preview.style.top = `${candidate.y * unit}px`;
+  preview.setAttribute('aria-hidden', 'true');
+  placed.append(preview);
+  return preview;
 }
 
 function moveDrag(event) {
@@ -289,12 +363,7 @@ function moveDrag(event) {
   drag.floating.style.top = `${event.clientY - drag.grabY * unit}px`;
   drag.preview?.remove();
   const candidate = candidateAt(event, drag);
-  if (!candidate) return;
-  const error = placementError(level(), current().states, drag.piece, candidate);
-  drag.preview = drawCrate(drag.piece, drag.rotation, unit, `preview${error ? ' is-invalid' : ''}`);
-  drag.preview.style.left = `${candidate.x * unit}px`;
-  drag.preview.style.top = `${candidate.y * unit}px`;
-  placed.append(drag.preview);
+  if (candidate) drag.preview = drawDropPreview(drag.piece, candidate, unit);
 }
 
 function releaseDrag() {
@@ -326,13 +395,32 @@ function finishDrag(event) {
   }
 }
 
-function placeAt(x, y) {
+function tapCandidate(x, y) {
   const id = current().selected;
-  if (!id) return;
+  if (!id || winTimer !== null) return null;
   const piece = pieceById(id);
   const { rotation } = current().states[id];
   const [[anchorX, anchorY]] = shape(piece.cells, rotation).cells;
-  tryPlacement(piece, { x: x - anchorX, y: y - anchorY, rotation });
+  return { piece, candidate: { x: x - anchorX, y: y - anchorY, rotation } };
+}
+
+function clearTapPreview() {
+  tapPreview?.remove();
+  tapPreview = null;
+}
+
+function placeAt(x, y) {
+  const target = tapCandidate(x, y);
+  if (target) tryPlacement(target.piece, target.candidate);
+}
+
+function gridPoint(event) {
+  const bounds = grid.getBoundingClientRect();
+  const unit = bounds.width / SIZE;
+  return [
+    Math.floor((event.clientX - bounds.left) / unit),
+    Math.floor((event.clientY - bounds.top) / unit),
+  ];
 }
 
 tray.addEventListener('pointerdown', startDrag);
@@ -345,16 +433,23 @@ document.addEventListener('lostpointercapture', finishDrag);
 tray.addEventListener('click', (event) => {
   const slot = event.target.closest('.tray-slot');
   if (slot && event.detail === 0) {
+    campAudio.play('pick');
     select(slot.dataset.piece);
     tray.querySelector(`[data-piece="${slot.dataset.piece}"]`)?.focus();
   }
 });
 
+grid.addEventListener('pointerdown', (event) => {
+  if (!isCamping() || drag || !event.isPrimary || event.button !== 0
+      || event.target.closest('[data-piece]')) return;
+  clearTapPreview();
+  const target = tapCandidate(...gridPoint(event));
+  if (target) tapPreview = drawDropPreview(target.piece, target.candidate, cellSize());
+});
+grid.addEventListener('pointercancel', clearTapPreview);
 grid.addEventListener('click', (event) => {
   if (event.target.closest('[data-piece]') || event.detail === 0) return;
-  const bounds = grid.getBoundingClientRect();
-  const unit = bounds.width / SIZE;
-  placeAt(Math.floor((event.clientX - bounds.left) / unit), Math.floor((event.clientY - bounds.top) / unit));
+  placeAt(...gridPoint(event));
 });
 
 grid.addEventListener('keydown', (event) => {
@@ -375,6 +470,8 @@ element('rotate').addEventListener('click', rotate);
 element('undo').addEventListener('click', undo);
 element('restart').addEventListener('click', restart);
 element('replay').addEventListener('click', restart);
+campHatch.addEventListener('animationend', finishClosing);
+win.addEventListener('close', () => document.body.classList.remove('is-closing'));
 new ResizeObserver(() => {
   if (!drag) renderPieces();
 }).observe(grid);
