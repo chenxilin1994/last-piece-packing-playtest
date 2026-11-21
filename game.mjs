@@ -1,6 +1,6 @@
-import { cargoIllustration } from './camping-art.mjs?v=camping-3';
+import { cargoIllustration } from './camping-art.mjs?v=gear-4';
 import { createCampingAudio } from './camping-audio.mjs';
-import { LEVELS } from './levels.mjs?v=camping-3';
+import { LEVELS } from './levels.mjs?v=gear-4';
 import { SIZE, placementError, shape } from './packing.mjs';
 
 const element = (id) => document.getElementById(id);
@@ -48,46 +48,47 @@ function setStatus(message = '', tone = '') {
   status.dataset.tone = tone;
 }
 
+function priorityTag() {
+  const tag = make('span', 'priority-tag');
+  tag.textContent = '先送';
+  tag.setAttribute('aria-hidden', 'true');
+  return tag;
+}
+
 function drawCrate(piece, rotation, unit, className = '') {
   const geometry = shape(piece.cells, rotation);
-  const crate = make('div', `crate ${piece.color} ${className}`);
-  const camping = isCamping();
+  const crate = make('div', `crate ${className}`);
   const preview = crate.classList.contains('preview');
-  const illustrationOnly = camping && (crate.classList.contains('is-dragging') || crate.classList.contains('miniature'));
-  if (camping) crate.classList.add('camping-crate');
+  const miniature = crate.classList.contains('miniature');
+  const floating = crate.classList.contains('is-dragging');
   crate.dataset.piece = piece.id;
   crate.dataset.rotation = rotation;
   crate.style.width = `${geometry.width * unit}px`;
   crate.style.height = `${geometry.height * unit}px`;
-  if (!illustrationOnly) {
-    const outline = new Set(geometry.cells.map(([x, y]) => `${x},${y}`));
-    // Round only corners on the outside perimeter.
+  if (!miniature && !floating) {
+    // Settled hit regions and landing previews both use the original occupied cells.
     for (const [x, y] of geometry.cells) {
       const tile = make('span', 'cargo-cell');
       tile.style.left = `${x * unit}px`;
       tile.style.top = `${y * unit}px`;
       tile.style.width = `${unit}px`;
       tile.style.height = `${unit}px`;
-      const left = outline.has(`${x - 1},${y}`);
-      const right = outline.has(`${x + 1},${y}`);
-      const above = outline.has(`${x},${y - 1}`);
-      const below = outline.has(`${x},${y + 1}`);
-      const radius = `${Math.max(2, Math.min(9, unit * 0.16))}px`;
-      tile.style.borderRadius = [!left && !above, !right && !above, !right && !below, !left && !below]
-        .map((corner) => corner ? radius : '0').join(' ');
       crate.append(tile);
     }
-    if (piece.door) crate.firstElementChild.classList.add('express');
   }
-  if (camping && !preview) {
-    crate.append(cargoIllustration(piece, rotation, unit));
-  }
-  if (camping && (crate.classList.contains('is-selected') || preview)) {
-    const [[x, y]] = geometry.cells;
-    const anchor = make('span', 'camp-anchor');
+  if (!preview) crate.append(cargoIllustration(piece, rotation, unit));
+  const [[x, y]] = geometry.cells;
+  if (crate.classList.contains('is-selected') || preview) {
+    const anchor = make('span', 'drop-anchor');
     anchor.style.left = `${(x + 0.5) * unit}px`;
     anchor.style.top = `${(y + 0.5) * unit}px`;
     crate.append(anchor);
+  }
+  if (piece.door && !preview && !miniature) {
+    const tag = priorityTag();
+    tag.style.left = `${(x + 0.5) * unit}px`;
+    tag.style.top = `${(y + 0.69) * unit}px`;
+    crate.append(tag);
   }
   return crate;
 }
@@ -121,6 +122,7 @@ function renderBoard() {
 function renderPieces() {
   const { states, selected } = current();
   const unit = cellSize();
+  const thumbnailUnit = Number.parseFloat(getComputedStyle(tray).getPropertyValue('--thumbnail-cell'));
   tapPreview = null;
   placed.replaceChildren();
   tray.replaceChildren();
@@ -134,13 +136,13 @@ function renderPieces() {
     slot.setAttribute('aria-pressed', selectedHere);
     slot.setAttribute('aria-label', `${piece.name}${onBoard ? '，已装入' : ''}${piece.door ? '，先送的货' : ''}`);
     const preview = make('span', 'crate-preview');
-    const camping = isCamping();
-    const miniature = drawCrate(piece, state.rotation, camping ? 16 : 11,
-      camping && selectedHere ? 'miniature is-selected' : 'miniature');
+    const miniature = drawCrate(piece, state.rotation, thumbnailUnit,
+      selectedHere ? 'miniature is-selected' : 'miniature');
     preview.append(miniature);
     const name = make('span', 'piece-name');
     name.textContent = piece.name;
     slot.append(preview, name);
+    if (piece.door) slot.append(priorityTag());
     tray.append(slot);
 
     if (onBoard) {
@@ -316,7 +318,7 @@ function startDrag(event) {
   const state = current().states[id];
   const onBoard = placed.contains(source);
   const geometry = shape(piece.cells, state.rotation);
-  const miniature = isCamping() ? source.querySelector('.miniature') : null;
+  const miniature = source.querySelector('.miniature');
   const bounds = (miniature ?? source).getBoundingClientRect();
   const fromMiniature = event.clientX >= bounds.left && event.clientX <= bounds.right
     && event.clientY >= bounds.top && event.clientY <= bounds.bottom
@@ -449,7 +451,7 @@ tray.addEventListener('click', (event) => {
 });
 
 grid.addEventListener('pointerdown', (event) => {
-  if (!isCamping() || drag || !event.isPrimary || event.button !== 0
+  if (drag || !event.isPrimary || event.button !== 0
       || event.target.closest('[data-piece]')) return;
   clearTapPreview();
   const target = tapCandidate(...gridPoint(event));
@@ -481,9 +483,11 @@ element('restart').addEventListener('click', restart);
 element('replay').addEventListener('click', restart);
 campHatch.addEventListener('animationend', finishClosing);
 win.addEventListener('close', () => document.body.classList.remove('is-closing'));
-new ResizeObserver(() => {
+const resize = new ResizeObserver(() => {
   if (!drag) renderPieces();
-}).observe(grid);
+});
+resize.observe(grid);
+resize.observe(tray);
 
 renderNav();
 renderLevel();

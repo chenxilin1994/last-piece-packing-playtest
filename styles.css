@@ -274,6 +274,7 @@ h1, h2, p { margin: 0; }
 #instruction { color: #465f55; font-size: 12px; line-height: 1.35; text-align: right; text-wrap: pretty; }
 
 #tray {
+  --thumbnail-cell: 16px;
   display: grid;
   align-items: stretch;
   grid-template-columns: repeat(auto-fit,minmax(min(100%,44px),1fr));
@@ -324,7 +325,7 @@ h1, h2, p { margin: 0; }
   position: relative;
   display: block;
   width: 100%;
-  min-height: 32px;
+  height: calc(var(--thumbnail-cell) * 3 + 2px);
   flex: none;
   pointer-events: none;
 }
@@ -332,80 +333,70 @@ h1, h2, p { margin: 0; }
 
 .crate {
   position: absolute;
-  --cargo: #f2a647;
-  --cargo-light: #ffdca0;
-  --cargo-dark: #9c541b;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
 }
-.crate.orange, [data-color="orange"] { --cargo: #f3a44c; --cargo-light: #ffd69a; --cargo-dark: #904616; }
-.crate.blue, [data-color="blue"] { --cargo: #6db5d0; --cargo-light: #bce9ed; --cargo-dark: #226281; }
-.crate.green, [data-color="green"] { --cargo: #9bc16d; --cargo-light: #d7eab0; --cargo-dark: #527037; }
-.crate.yellow, [data-color="yellow"] { --cargo: #efcd5e; --cargo-light: #fff3aa; --cargo-dark: #80651f; }
-.crate.purple, [data-color="purple"] { --cargo: #aa9bd1; --cargo-light: #dfd5f3; --cargo-dark: #574783; }
-.crate.red, [data-color="red"] { --cargo: #f48e7a; --cargo-light: #ffd0c2; --cargo-dark: #8b382c; }
-.cargo-cell {
-  position: absolute;
+.cargo-cell { position: absolute; display: block; }
+.crate.is-dragging, .crate.is-ghost, .preview { cursor: grabbing; pointer-events: none; }
+.crate.is-dragging {
+  filter: drop-shadow(0 5px 5px #102d2a5e);
+  transform: translateY(-9px);
+}
+.crate.is-ghost { opacity: .58; }
+.cargo-art {
   display: block;
-  background: linear-gradient(139deg,var(--cargo-light) -55%,var(--cargo) 76%);
-  box-shadow: inset 0 0 0 1px var(--cargo-dark), inset 0 -3px 0 #25332922, inset 0 2px 0 #fff8cf50;
-}
-.cargo-cell::before {
-  content: "";
   position: absolute;
-  height: 80%;
-  width: 17%;
-  left: 41.5%;
-  top: 10%;
-  border-inline: 1px solid #5f431231;
-  background: #fff2c354;
+  left: 50%;
+  top: 50%;
+  object-fit: contain;
+  pointer-events: none;
 }
-.cargo-cell:first-child::after {
-  content: "";
+.crate.is-selected:not(.miniature) .cargo-art {
+  filter: drop-shadow(0 1px 2px #17391c66);
+}
+.crate.preview { opacity: .85; }
+.crate.preview .cargo-cell {
+  border-radius: 4px;
+  background: #b8d6948f;
+  box-shadow: inset 0 0 0 2px #36572c;
+}
+.crate.preview.is-invalid .cargo-cell {
+  background: repeating-linear-gradient(-45deg, #b63f32d4 0 4px, #f0ac84bd 4px 8px);
+  box-shadow: inset 0 0 0 2px #8e3226;
+}
+.drop-anchor {
   position: absolute;
-  width: 28%;
-  height: 17%;
-  right: 6%;
-  bottom: 8%;
-  border: 1px solid #714c2733;
-  border-radius: 1px;
-  background: repeating-linear-gradient(90deg,#61472d 0 1px,#fff5d9 1px 3px);
-  opacity: .83;
+  z-index: 3;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff8d8;
+  border-radius: 50%;
+  background: #214834;
+  outline: 1px solid #26442b;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
-.cargo-cell.express:first-child::after {
-  content: "先送";
-  width: auto;
-  height: auto;
+.miniature .drop-anchor { width: 6px; height: 6px; border-width: 1px; }
+.crate.preview.is-invalid .drop-anchor { background: #8e3226; }
+.priority-tag {
+  position: absolute;
+  z-index: 4;
   padding: 1px 3px;
-  border-color: #8e4d0b;
+  border: 1px solid #8e4d0b;
+  border-radius: 4px;
   background: #fff6bf;
-  color: #4e2a06;
+  color: #642f0f;
   font-size: 10px;
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1;
   white-space: nowrap;
-  opacity: 1;
+  pointer-events: none;
 }
-.miniature .cargo-cell.express:first-child::after {
-  content: "";
-  width: 72%;
-  height: 32%;
-  padding: 0;
-  border: 0;
-  background: #fff6bf;
-}
-.crate.is-selected .cargo-cell {
-  box-shadow: inset 0 0 0 2px var(--cargo-dark), inset 0 -3px 0 #25332922, inset 0 2px 0 #fff8cf73;
-}
-.crate.is-dragging, .crate.is-ghost, .preview { cursor: grabbing; pointer-events: none; }
-.crate.is-dragging { z-index: 8; filter: drop-shadow(0 5px 5px #102d2a65); }
-.crate.is-ghost, .preview { opacity: .58; }
-.crate.is-invalid .cargo-cell, .preview.is-invalid .cargo-cell {
-  background: #db5d54;
-  box-shadow: inset 0 0 0 2px #81231b;
-}
+.crate .priority-tag { transform: translateX(-50%); }
+.tray-slot .priority-tag { top: 3px; right: 3px; }
+.tray-slot.is-placed .priority-tag { right: auto; left: 3px; }
 
 .actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
 .action {
@@ -508,6 +499,7 @@ h1, h2, p { margin: 0; }
   #tray { gap: 4px; }
 }
 @media (max-width: 340px) { #tray { gap: 3px; } }
+@media (max-width: 374px) and (max-height: 740px) { #tray { --thumbnail-cell: 12px; } }
 @media (max-width: 319px) {
   #tray { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .game-header h1 { font-size: 19px; }
@@ -747,7 +739,7 @@ body.is-camping {
   background: repeating-linear-gradient(-45deg,#475d46 0 6px,#3a4f3b 6px 12px);
   box-shadow: inset 0 0 0 2px #263a30;
 }
-.is-camping .cell.blocked::before {
+.cell.blocked::before {
   content: "";
   position: absolute;
   inset: 12%;
@@ -801,58 +793,12 @@ body.is-camping {
   box-shadow: inset 0 0 0 1px #49714a;
   background: #e4ecd3;
 }
-.is-camping .crate-preview { height: 50px; }
+.is-camping #tray { --thumbnail-cell: 16px; }
 .is-camping .action { background: #fcf3db; border-color: #36523c; box-shadow: 0 2px 0 #36523c; }
 .is-camping .action-primary { background: #eabd6f; }
 .is-camping .action:disabled { background: #e6e3ca; color: #646d56; border-color: #9ca385; box-shadow: none; }
 .is-camping .action:active:not(:disabled) { box-shadow: none; background: #e7d3a6; }
 .is-camping .win { background: #fff3d8; }
-
-/* Settled equipment is drawn by its sprite. Only a candidate drop marks the floor. */
-.crate.camping-crate .cargo-cell {
-  background: transparent;
-  box-shadow: none;
-}
-.crate.camping-crate .cargo-cell::before,
-.crate.camping-crate .cargo-cell::after { display: none; }
-.crate.camping-crate.is-dragging {
-  filter: drop-shadow(0 5px 5px #102d2a5e);
-  transform: translateY(-9px);
-}
-.crate.camping-crate .cargo-art {
-  display: block;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  object-fit: contain;
-  pointer-events: none;
-}
-.crate.camping-crate.is-selected:not(.miniature) .cargo-art {
-  filter: drop-shadow(0 1px 2px #17391c66);
-}
-.crate.camping-crate.preview { opacity: .85; }
-.crate.camping-crate.preview .cargo-cell {
-  background: #b8d6948f;
-  box-shadow: inset 0 0 0 2px #36572c;
-}
-.crate.camping-crate.preview.is-invalid .cargo-cell {
-  background: repeating-linear-gradient(-45deg, #b63f32d4 0 4px, #f0ac84bd 4px 8px);
-  box-shadow: inset 0 0 0 2px #8e3226;
-}
-.camp-anchor {
-  position: absolute;
-  z-index: 3;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #fff8d8;
-  border-radius: 50%;
-  background: #214834;
-  outline: 1px solid #26442b;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-.miniature .camp-anchor { width: 6px; height: 6px; border-width: 1px; }
-.crate.camping-crate.preview.is-invalid .camp-anchor { background: #8e3226; }
 
 /* The layer uses the frame padding edge to match the square board. */
 .is-camping #camp-hatch {
