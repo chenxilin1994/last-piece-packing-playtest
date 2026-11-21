@@ -18,7 +18,7 @@ function readMute() {
   catch { return false; }
 }
 
-export function createCampingAudio(button) {
+export function createGameAudio(button) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   const voices = new Set();
   let context;
@@ -26,7 +26,6 @@ export function createCampingAudio(button) {
   let effects;
   let pluckWave;
   let texture;
-  let active = false;
   let muted = readMute();
   let timer = null;
   let step = 0;
@@ -34,13 +33,12 @@ export function createCampingAudio(button) {
   let pendingEffect;
 
   function allowed() {
-    return active && !muted && !document.hidden;
+    return !muted && !document.hidden;
   }
 
   function updateButton() {
     if (!button) return;
     const playing = allowed() && context?.state === 'running';
-    button.hidden = !active;
     button.disabled = !AudioContextClass;
     button.dataset.state = !AudioContextClass ? 'unavailable' : muted ? 'muted' : playing ? 'on' : 'ready';
     button.setAttribute('aria-pressed', String(playing));
@@ -144,7 +142,7 @@ export function createCampingAudio(button) {
       clearInterval(timer);
       timer = null;
       if (!allowed() && context?.state === 'running') {
-        // A fast level switch can re-enable sound while suspension is still pending.
+        // Unmuting or returning to the tab can happen while suspension is pending.
         context.suspend().then(() => wake()).catch(() => {});
       }
     }
@@ -208,13 +206,6 @@ export function createCampingAudio(button) {
   updateButton();
 
   return {
-    setActive(next) {
-      if (active === next) return;
-      active = next;
-      if (active) wake();
-      else pause();
-      updateButton();
-    },
     play(name) {
       if (!allowed() || !AudioContextClass || !Object.hasOwn(sounds, name)) return;
       if (context?.state === 'running') sounds[name](context.currentTime + 0.01);

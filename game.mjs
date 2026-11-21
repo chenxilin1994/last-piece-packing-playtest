@@ -1,5 +1,5 @@
 import { cargoIllustration } from './camping-art.mjs?v=gear-4';
-import { createCampingAudio } from './camping-audio.mjs';
+import { createGameAudio } from './camping-audio.mjs?v=audio-5';
 import { LEVELS } from './levels.mjs?v=gear-4';
 import { SIZE, placementError, shape } from './packing.mjs';
 
@@ -10,7 +10,7 @@ const tray = element('tray');
 const win = element('win');
 const status = element('status');
 const campHatch = element('camp-hatch');
-const campAudio = createCampingAudio(element('camp-sound'));
+const gameAudio = createGameAudio(element('camp-sound'));
 const CAMPING_LEVEL = 2;
 const boardKeys = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
@@ -168,7 +168,6 @@ function renderCursor() {
 
 function renderLevel() {
   document.body.classList.toggle('is-camping', isCamping());
-  campAudio.setActive(isCamping());
   element('level-title').textContent = level().name;
   element('objective').textContent = level().objective;
   element('instruction').textContent = level().instruction;
@@ -201,17 +200,13 @@ function finishClosing() {
   if (winTimer === null) return;
   clearTimeout(winTimer);
   winTimer = null;
-  campAudio.play('win');
+  gameAudio.play('win');
   showWin();
 }
 
 function completeRound() {
-  if (!isCamping()) {
-    showWin();
-    return;
-  }
   document.body.classList.add('is-closing');
-  campAudio.play('hatch');
+  gameAudio.play('hatch');
   winTimer = setTimeout(finishClosing, 700);
 }
 
@@ -250,7 +245,7 @@ function commit(id, placement, effect = 'place') {
   round.selected = id;
   setStatus();
   renderPieces();
-  campAudio.play(effect);
+  gameAudio.play(effect);
   const solved = loadedCount(round) === level().pieces.length;
   element('level-nav').children[levelIndex].classList.toggle('is-complete', solved);
   if (solved && !wasSolved) completeRound();
@@ -260,7 +255,7 @@ function tryPlacement(piece, candidate, effect) {
   const error = placementError(level(), current().states, piece, candidate);
   if (error) {
     setStatus(error, 'error');
-    campAudio.play('reject');
+    gameAudio.play('reject');
     return false;
   }
   commit(piece.id, candidate, effect);
@@ -283,14 +278,14 @@ function undo() {
   round.states[id] = before;
   round.selected = id;
   setStatus('已撤回上一步。');
-  campAudio.play('undo');
+  gameAudio.play('undo');
   renderPieces();
   element('level-nav').children[levelIndex].classList.toggle('is-complete', loadedCount(round) === level().pieces.length);
 }
 
 function restart() {
   if (drag) return;
-  campAudio.play('reset');
+  gameAudio.play('reset');
   rounds[levelIndex] = freshRound(level());
   goTo(levelIndex);
 }
@@ -314,7 +309,7 @@ function startDrag(event) {
   const piece = pieceById(id);
   if (!piece) return;
   clearTapPreview();
-  campAudio.play('pick');
+  gameAudio.play('pick');
   const state = current().states[id];
   const onBoard = placed.contains(source);
   const geometry = shape(piece.cells, state.rotation);
@@ -444,7 +439,7 @@ document.addEventListener('lostpointercapture', finishDrag);
 tray.addEventListener('click', (event) => {
   const slot = event.target.closest('.tray-slot');
   if (slot && event.detail === 0) {
-    campAudio.play('pick');
+    gameAudio.play('pick');
     select(slot.dataset.piece);
     tray.querySelector(`[data-piece="${slot.dataset.piece}"]`)?.focus();
   }
