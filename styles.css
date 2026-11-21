@@ -824,38 +824,32 @@ body.is-camping {
 .is-camping .action:active:not(:disabled) { box-shadow: none; background: #e7d3a6; }
 .is-camping .win { background: #fff3d8; }
 
-/* Object edges follow only occupied tiles. Artwork never changes hit testing. */
+/* Floor markings show occupied tiles. The same artwork is used on each surface. */
 .crate.camping-crate .cargo-cell {
-  background: color-mix(in srgb,var(--cargo) 60%,#d8cdb2);
+  background: color-mix(in srgb,var(--cargo) 33%,transparent);
   box-shadow: none;
 }
 .crate.camping-crate:not(.preview) .cargo-cell {
-  border-style: solid;
-  border-color: var(--cargo-dark);
+  border-style: dashed;
+  border-color: color-mix(in srgb,var(--cargo-dark) 70%,transparent);
 }
+.miniature.camping-crate .cargo-cell { background: var(--cargo); }
 .crate.camping-crate .cargo-cell::before,
 .crate.camping-crate .cargo-cell::after { display: none; }
-.crate.camping-crate.is-dragging .cargo-cell {
-  border-style: dashed;
-  background: color-mix(in srgb,var(--cargo) 23%,transparent);
-}
 .crate.camping-crate.is-dragging {
-  filter: drop-shadow(0 3px 3px #102d2a47);
-  transform: translateY(-7px);
+  filter: drop-shadow(0 5px 5px #102d2a5e);
+  transform: translateY(-9px);
 }
-.crate.camping-crate .cargo-art,
-.crate.camping-crate .cargo-art-plane,
-.crate.camping-crate .cargo-art-clip {
+.crate.camping-crate .cargo-art {
+  display: block;
   position: absolute;
+  object-fit: contain;
   pointer-events: none;
 }
-.cargo-art-clip { inset: 0; }
-.cargo-art-plane { left: 50%; top: 50%; }
-.cargo-art { display: block; object-fit: contain; }
-.crate.camping-crate.is-selected { filter: drop-shadow(0 0 1.5px #17391c); }
+.crate.camping-crate.is-selected:not(.miniature) .cargo-art {
+  filter: drop-shadow(0 1px 2px #17391c66);
+}
 .crate.camping-crate.preview { opacity: .85; }
-.crate.camping-crate.preview .cargo-art,
-.crate.camping-crate.preview .cargo-art-plane { display: none; }
 .crate.camping-crate.preview .cargo-cell {
   background: #b8d6948f;
   box-shadow: inset 0 0 0 2px #36572c;

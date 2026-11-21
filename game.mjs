@@ -1,4 +1,4 @@
-import { cargoIllustration, trayIllustration } from './camping-art.mjs';
+import { cargoArtCenter, cargoIllustration, trayIllustration } from './camping-art.mjs?v=camping-2';
 import { createCampingAudio } from './camping-audio.mjs';
 import { LEVELS } from './levels.mjs?v=camping-1';
 import { SIZE, placementError, shape } from './packing.mjs';
@@ -58,6 +58,10 @@ function drawCrate(piece, rotation, unit, className = '') {
   crate.dataset.rotation = rotation;
   crate.style.width = `${geometry.width * unit}px`;
   crate.style.height = `${geometry.height * unit}px`;
+  if (camping && crate.classList.contains('is-dragging')) {
+    crate.append(cargoIllustration(piece, rotation, unit, geometry));
+    return crate;
+  }
   const outline = new Set(geometry.cells.map(([x, y]) => `${x},${y}`));
   // Round only exposed corners so irregular pieces read as one object.
   for (const [x, y] of geometry.cells) {
@@ -317,8 +321,17 @@ function startDrag(event) {
   const state = current().states[id];
   const onBoard = placed.contains(source);
   const geometry = shape(piece.cells, state.rotation);
-  const rect = source.getBoundingClientRect();
   const fromMiniature = !onBoard && source.classList.contains('miniature');
+  let grab = { x: geometry.width / 2, y: geometry.height / 2 };
+  if (onBoard || fromMiniature) {
+    const rect = source.getBoundingClientRect();
+    grab = {
+      x: (event.clientX - rect.left) / rect.width * geometry.width,
+      y: (event.clientY - rect.top) / rect.height * geometry.height,
+    };
+  } else if (isCamping()) {
+    grab = cargoArtCenter(piece, state.rotation, geometry);
+  }
   drag = {
     pointerId: event.pointerId,
     piece,
@@ -326,8 +339,8 @@ function startDrag(event) {
     onBoard,
     startX: event.clientX,
     startY: event.clientY,
-    grabX: onBoard || fromMiniature ? (event.clientX - rect.left) / rect.width * geometry.width : geometry.width / 2,
-    grabY: onBoard || fromMiniature ? (event.clientY - rect.top) / rect.height * geometry.height : geometry.height / 2,
+    grabX: grab.x,
+    grabY: grab.y,
     moved: false,
   };
   source.setPointerCapture(event.pointerId);

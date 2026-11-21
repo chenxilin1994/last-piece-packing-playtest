@@ -1,11 +1,11 @@
 import { shape } from './packing.mjs';
 
 const equipment = {
-  a: { file: 'camp-chair', x: 0.03, y: 0.38, width: 0.94, height: 1.60 },
-  b: { file: 'snack-box', x: 0.03, y: 0.03, width: 1.94, height: 1.91 },
-  c: { file: 'camp-rack', x: 0.68, y: 0.02, width: 1.65, height: 0.96 },
-  d: { file: 'tool-bag', x: 0.04, y: 0.04, width: 1.92, height: 1.92 },
-  e: { file: 'rain-umbrella', x: 0.67, y: 0.69, width: 1.66, height: 1.66, tilt: -40 },
+  a: { file: 'camp-chair', x: 0.5, y: 1.44, width: 0.92, height: 1.14 },
+  b: { file: 'snack-box', x: 1, y: 1, width: 1.9, height: 1.6 },
+  c: { file: 'camp-rack', x: 1.5, y: 0.5, width: 0.88, height: 0.95 },
+  d: { file: 'tool-bag', x: 1, y: 1, width: 1.83, height: 1.90 },
+  e: { file: 'rain-umbrella', x: 1.18, y: 2.13, width: 1.59, height: 1.68 },
 };
 
 function equipmentImage(id, className) {
@@ -23,33 +23,28 @@ export function trayIllustration(id, rotation) {
   return image;
 }
 
-export function cargoIllustration(piece, rotation, unit, geometry) {
-  const { x, y, width, height, tilt = 0 } = equipment[piece.id];
+export function cargoArtCenter(piece, rotation, geometry) {
+  const { x, y } = equipment[piece.id];
   const base = shape(piece.cells, 0);
-  const clip = document.createElement('span');
-  clip.className = 'cargo-art-clip';
-  const cells = geometry.cells.map(([column, row]) => {
-    const left = column * unit;
-    const top = row * unit;
-    return `M ${left} ${top} h ${unit} v ${unit} h ${-unit} Z`;
-  });
-  clip.style.clipPath = `path("${cells.join(' ')}")`;
+  const angle = rotation * Math.PI / 2;
+  const horizontal = x - base.width / 2;
+  const vertical = y - base.height / 2;
+  return {
+    x: geometry.width / 2 + horizontal * Math.cos(angle) - vertical * Math.sin(angle),
+    y: geometry.height / 2 + horizontal * Math.sin(angle) + vertical * Math.cos(angle),
+  };
+}
 
-  const plane = document.createElement('span');
-  plane.className = 'cargo-art-plane';
-  plane.style.width = `${base.width * unit}px`;
-  plane.style.height = `${base.height * unit}px`;
-  plane.style.transform = `translate(-50%, -50%) rotate(${rotation * 90}deg)`;
-
+export function cargoIllustration(piece, rotation, unit, geometry) {
+  const { width, height } = equipment[piece.id];
+  const center = cargoArtCenter(piece, rotation, geometry);
   const image = equipmentImage(piece.id, 'cargo-art');
   Object.assign(image.style, {
-    left: `${x * unit}px`,
-    top: `${y * unit}px`,
+    left: `${center.x * unit}px`,
+    top: `${center.y * unit}px`,
     width: `${width * unit}px`,
     height: `${height * unit}px`,
-    transform: `rotate(${tilt}deg)`,
+    transform: `translate(-50%, -50%) rotate(${rotation * 90}deg)`,
   });
-  plane.append(image);
-  clip.append(plane);
-  return clip;
+  return image;
 }
