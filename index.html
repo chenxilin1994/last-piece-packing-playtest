@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f0df">
+  <title>最后一件装得下吗</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./game.mjs"></script>
+</head>
+<body>
+  <main class="game">
+    <header class="game-header">
+      <span class="package-mark" aria-hidden="true"><i></i></span>
+      <h1>最后一件装得下吗<span aria-hidden="true">？</span></h1>
+    </header>
+
+    <nav id="level-nav" class="level-nav" aria-label="选择关卡"></nav>
+
+    <div class="game-layout">
+      <section class="mission" aria-labelledby="level-title">
+        <div class="mission-reference" aria-hidden="true"></div>
+        <div class="mission-copy">
+          <h2 id="level-title"></h2>
+          <p id="objective"></p>
+        </div>
+        <p id="progress" class="progress"></p>
+      </section>
+
+      <section class="load-bed" aria-label="后备厢">
+        <div class="load-bed-head" aria-hidden="true">
+          <span>后备厢</span>
+          <span>5 × 5</span>
+        </div>
+        <div class="load-bed-frame">
+          <div id="grid" aria-label="五行五列装箱区" aria-describedby="instruction">
+            <div id="cells"></div>
+            <div id="placed"></div>
+          </div>
+          <div class="door-indicator">车门</div>
+        </div>
+        <div class="load-bed-tail" aria-hidden="true"><i></i><i></i></div>
+      </section>
+
+      <section class="cargo" aria-label="货架">
+        <div class="cargo-heading">
+          <h2>待装货物</h2>
+          <p id="instruction"></p>
+        </div>
+        <div id="tray" aria-label="选择货物"></div>
+      </section>
+
+      <div class="actions" aria-label="操作">
+        <button type="button" id="rotate" class="action action-primary">
+          <span class="action-icon icon-rotate" aria-hidden="true"></span><span>旋转</span>
+        </button>
+        <button type="button" id="undo" class="action">
+          <span class="action-icon icon-undo" aria-hidden="true"></span><span>撤回</span>
+        </button>
+        <button type="button" id="restart" class="action">
+          <span class="action-icon icon-restart" aria-hidden="true"></span><span>重开</span>
+        </button>
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </div>
+  </main>
+  <dialog id="win" class="win" aria-labelledby="win-title">
+    <span class="package-mark" aria-hidden="true"><i></i></span>
+    <h2 id="win-title"></h2>
+    <p id="win-text"></p>
+    <div class="win-actions">
+      <button type="button" id="replay" class="action">再玩一次</button>
+      <button type="button" id="next-level" class="action action-primary">下一关</button>
+    </div>
+  </dialog>
+  <noscript>请启用 JavaScript 后打开试玩。</noscript>
+</body>
+</html>
