@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f0df">
   <title>最后一件装得下吗</title>
-  <link rel="stylesheet" href="./styles.css?v=audio-5.1">
-  <script type="module" src="./game.mjs?v=audio-5"></script>
+  <link rel="stylesheet" href="./styles.css?v=guide-6">
+  <script type="module" src="./game.mjs?v=guide-6"></script>
 </head>
 <body>
   <div class="camp-landscape" aria-hidden="true">
@@ -20,30 +20,43 @@
     <header class="game-header">
       <span class="package-mark" aria-hidden="true"><i></i></span>
       <h1>最后一件装得下吗<span aria-hidden="true">？</span></h1>
-      <button type="button" id="camp-sound" aria-pressed="false">
-        <span class="sound-icon" aria-hidden="true"></span><span data-camp-sound-label>声音</span>
+      <button type="button" id="camp-sound" data-enabled="true" aria-label="声音设置"
+        aria-haspopup="dialog" aria-controls="sound-settings" aria-expanded="false">
+        <span class="sound-icon" aria-hidden="true"></span><span>声音</span>
       </button>
     </header>
 
     <nav id="level-nav" class="level-nav" aria-label="选择关卡"></nav>
 
     <div class="game-layout">
-      <section class="mission" aria-labelledby="level-title">
-        <div class="mission-reference" aria-hidden="true"></div>
-        <div class="mission-copy">
-          <h2 id="level-title"></h2>
-          <p id="objective"></p>
-        </div>
-        <p id="progress" class="progress"></p>
-      </section>
+      <div class="stage-brief">
+        <section class="mission" aria-labelledby="level-title">
+          <div class="mission-reference" aria-hidden="true"></div>
+          <div class="mission-copy">
+            <div class="mission-heading"><h2 id="level-title"></h2><span id="difficulty" hidden></span></div>
+            <p id="objective"></p>
+          </div>
+          <p id="progress" class="progress"></p>
+        </section>
+        <section id="tutorial" class="tutorial" aria-label="新手引导" hidden>
+          <div class="tutorial-copy" aria-live="polite">
+            <div class="tutorial-heading"><span>新手引导</span><span id="tutorial-progress"></span></div>
+            <p><strong id="tutorial-title"></strong> <span id="tutorial-text"></span></p>
+          </div>
+          <div class="tutorial-actions">
+            <button type="button" id="tutorial-next">下一步</button>
+            <button type="button" id="tutorial-skip">跳过</button>
+          </div>
+        </section>
+      </div>
 
-      <section class="load-bed" aria-label="后备厢">
-        <div class="load-bed-head" aria-hidden="true">
-          <span>后备厢</span>
-          <span>5 × 5</span>
+      <section class="load-bed" aria-labelledby="vehicle-label">
+        <div class="load-bed-head">
+          <span id="vehicle-label">后备厢</span>
+          <span id="board-size">5 × 5</span>
         </div>
         <div class="load-bed-frame">
-          <div id="grid" aria-label="五行五列装箱区" aria-describedby="instruction">
+          <div id="grid" aria-label="装箱区" aria-describedby="instruction">
             <div id="cells"></div>
             <div id="placed"></div>
             <div id="camp-hatch" aria-hidden="true">
@@ -59,6 +72,7 @@
       <section class="cargo" aria-label="货架">
         <div class="cargo-heading">
           <h2>待装货物</h2>
+          <button type="button" id="tutorial-open" aria-controls="tutorial" hidden>看引导</button>
           <p id="instruction"></p>
         </div>
         <div id="tray" aria-label="选择货物"></div>
@@ -75,7 +89,10 @@
           <span class="action-icon icon-restart" aria-hidden="true"></span><span>重开</span>
         </button>
       </div>
-      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <div class="play-feedback">
+        <p id="rotation-help" hidden>已装入的货物可以移动，拖回货架后可以旋转。</p>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </div>
     </div>
   </main>
   <dialog id="win" class="win" aria-labelledby="win-title">
@@ -86,6 +103,25 @@
       <button type="button" id="replay" class="action">再玩一次</button>
       <button type="button" id="next-level" class="action action-primary">下一关</button>
     </div>
+  </dialog>
+  <dialog id="sound-settings" class="sound-settings" aria-labelledby="sound-title">
+    <h2 id="sound-title">声音设置</h2>
+    <label class="sound-switch">
+      <span>背景音乐与操作音效</span>
+      <input type="checkbox" id="sound-enabled" checked>
+    </label>
+    <div class="sound-volume">
+      <label for="sound-volume">音量</label>
+      <output id="sound-volume-value" for="sound-volume">75%</output>
+      <input type="range" id="sound-volume" min="0" max="100" value="75">
+    </div>
+    <fieldset class="sound-styles">
+      <legend>声音风格</legend>
+      <label><input type="radio" name="sound-style" value="camp" checked>露营原声</label>
+      <label><input type="radio" name="sound-style" value="bright">轻快</label>
+      <label><input type="radio" name="sound-style" value="wood">木质</label>
+    </fieldset>
+    <button type="button" id="sound-close" class="action action-primary">完成</button>
   </dialog>
   <noscript>请启用 JavaScript 后打开试玩。</noscript>
 </body>

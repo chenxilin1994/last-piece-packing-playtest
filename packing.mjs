@@ -1,5 +1,9 @@
 export const SIZE = 5;
 
+export function boardSize(level) {
+  return { width: level.width ?? SIZE, height: level.height ?? SIZE };
+}
+
 export function shape(cells, rotation) {
   let points = cells;
   for (let turn = 0; turn < rotation; turn += 1) {
@@ -18,8 +22,9 @@ export function footprint(piece, state) {
 }
 
 export function placementError(level, states, piece, candidate) {
+  const { width, height } = boardSize(level);
   const cells = footprint(piece, candidate);
-  if (cells.some(([x, y]) => x < 0 || y < 0 || x >= SIZE || y >= SIZE)) {
+  if (cells.some(([x, y]) => x < 0 || y < 0 || x >= width || y >= height)) {
     return '货物要全部放进车厢。';
   }
   const occupied = level.pieces.flatMap((other) => {
@@ -30,8 +35,8 @@ export function placementError(level, states, piece, candidate) {
   if (cells.some(([x, y]) => forbidden.has(`${x},${y}`))) {
     return '这里被占了，换个位置试试。';
   }
-  if (piece.door && !cells.some(([, y]) => y === SIZE - 1)) {
-    return '先送的货至少要有一格贴着底部车门。';
+  if (piece.door && !cells.some(([, y]) => y === height - 1)) {
+    return '先取的货至少要有一格贴着底部车门。';
   }
   return '';
 }

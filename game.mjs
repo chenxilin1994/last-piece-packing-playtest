@@ -1,7 +1,8 @@
 import { cargoIllustration } from './camping-art.mjs?v=gear-4';
-import { createGameAudio } from './camping-audio.mjs?v=audio-5';
-import { LEVELS } from './levels.mjs?v=gear-4';
-import { SIZE, placementError, shape } from './packing.mjs';
+import { createGameAudio } from './camping-audio.mjs?v=settings-6';
+import { LEVELS } from './levels.mjs?v=guide-6';
+import { boardSize, placementError, shape } from './packing.mjs?v=guide-6';
+import { createTutorial } from './tutorial.mjs?v=guide-6';
 
 const element = (id) => document.getElementById(id);
 const grid = element('grid');
@@ -11,6 +12,7 @@ const win = element('win');
 const status = element('status');
 const campHatch = element('camp-hatch');
 const gameAudio = createGameAudio(element('camp-sound'));
+const tutorial = createTutorial();
 const CAMPING_LEVEL = 2;
 const boardKeys = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
@@ -34,7 +36,7 @@ const isCamping = () => levelIndex === CAMPING_LEVEL;
 const current = () => rounds[levelIndex];
 const level = () => LEVELS[levelIndex];
 const pieceById = (id) => level().pieces.find((piece) => piece.id === id);
-const cellSize = () => grid.getBoundingClientRect().width / SIZE;
+const cellSize = () => grid.getBoundingClientRect().width / boardSize(level()).width;
 const loadedCount = (round) => Object.values(round.states).filter(({ x }) => x !== null).length;
 
 function make(tag, className = '') {
@@ -50,7 +52,7 @@ function setStatus(message = '', tone = '') {
 
 function priorityTag() {
   const tag = make('span', 'priority-tag');
-  tag.textContent = '先送';
+  tag.textContent = '先取';
   tag.setAttribute('aria-hidden', 'true');
   return tag;
 }
@@ -107,13 +109,21 @@ function renderNav() {
 
 function renderBoard() {
   const cells = element('cells');
+  const data = level();
+  const { width, height } = boardSize(data);
   cells.replaceChildren();
-  grid.classList.toggle('has-door', level().doorRow);
-  for (let y = 0; y < SIZE; y += 1) {
-    for (let x = 0; x < SIZE; x += 1) {
+  grid.style.setProperty('--board-columns', width);
+  grid.style.setProperty('--board-rows', height);
+  grid.classList.toggle('has-door', data.doorRow);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
       const cell = make('span', 'cell');
-      if (level().blocked.some(([bx, by]) => x === bx && y === by)) cell.classList.add('blocked');
-      if (level().doorRow && y === SIZE - 1) cell.classList.add('door-cell');
+      if (data.blocked.some(([bx, by]) => x === bx && y === by)) cell.classList.add('blocked');
+      if (x === width - 1) cell.classList.add('last-column');
+      if (y === height - 1) {
+        cell.classList.add('last-row');
+        if (data.doorRow) cell.classList.add('door-cell');
+      }
       cells.append(cell);
     }
   }
@@ -122,11 +132,17 @@ function renderBoard() {
 function renderPieces() {
   const { states, selected } = current();
   const unit = cellSize();
-  const thumbnailUnit = Number.parseFloat(getComputedStyle(tray).getPropertyValue('--thumbnail-cell'));
+  const pieces = level().pieces;
+  const longestPiece = Math.max(...pieces.map(({ cells }) => {
+    const { width, height } = shape(cells, 0);
+    return Math.max(width, height);
+  }));
+  const thumbnailUnit = Number.parseFloat(getComputedStyle(tray).getPropertyValue('--thumbnail-cell'))
+    * Math.min(1, 3 / longestPiece);
   tapPreview = null;
   placed.replaceChildren();
   tray.replaceChildren();
-  for (const piece of level().pieces) {
+  for (const piece of pieces) {
     const state = states[piece.id];
     const selectedHere = selected === piece.id;
     const onBoard = state.x !== null;
@@ -134,7 +150,7 @@ function renderPieces() {
     slot.type = 'button';
     slot.dataset.piece = piece.id;
     slot.setAttribute('aria-pressed', selectedHere);
-    slot.setAttribute('aria-label', `${piece.name}${onBoard ? '，已装入' : ''}${piece.door ? '，先送的货' : ''}`);
+    slot.setAttribute('aria-label', `${piece.name}${onBoard ? '，已装入' : ''}${piece.door ? '，先取的货' : ''}`);
     const preview = make('span', 'crate-preview');
     const miniature = drawCrate(piece, state.rotation, thumbnailUnit,
       selectedHere ? 'miniature is-selected' : 'miniature');
@@ -155,22 +171,37 @@ function renderPieces() {
       placed.append(crate);
     }
   }
-  element('progress').textContent = `${loadedCount(current())} / ${level().pieces.length} 件已装`;
+  element('progress').textContent = `${loadedCount(current())} / ${pieces.length} 件已装`;
   element('undo').disabled = current().history.length === 0;
-  element('rotate').disabled = !selected;
+  const selectedOnBoard = selected && states[selected].x !== null;
+  const rotateButton = element('rotate');
+  rotateButton.disabled = !selected || selectedOnBoard;
+  element('rotation-help').hidden = !selectedOnBoard;
+  if (selectedOnBoard) rotateButton.setAttribute('aria-describedby', 'rotation-help');
+  else rotateButton.removeAttribute('aria-describedby');
 }
 
 function renderCursor() {
+  const data = level();
+  const { width, height } = boardSize(data);
   element('cells').querySelector('.keyboard-cursor')?.classList.remove('keyboard-cursor');
-  element('cells').children[cursor.y * SIZE + cursor.x]?.classList.add('keyboard-cursor');
-  grid.setAttribute('aria-label', `车厢，第 ${cursor.y + 1} 行第 ${cursor.x + 1} 列。方向键移动，回车放置。`);
+  element('cells').children[cursor.y * width + cursor.x]?.classList.add('keyboard-cursor');
+  grid.setAttribute('aria-label', `${data.vehicle || '后备厢'}，${height} 行 ${width} 列。当前位置第 ${cursor.y + 1} 行第 ${cursor.x + 1} 列。方向键移动，回车放置。`);
 }
 
 function renderLevel() {
+  const data = level();
+  const { width, height } = boardSize(data);
   document.body.classList.toggle('is-camping', isCamping());
-  element('level-title').textContent = level().name;
-  element('objective').textContent = level().objective;
-  element('instruction').textContent = level().instruction;
+  document.body.dataset.theme = data.theme || '';
+  element('level-title').textContent = data.name;
+  element('vehicle-label').textContent = data.vehicle || '后备厢';
+  element('board-size').textContent = `${width} × ${height}`;
+  const difficulty = element('difficulty');
+  difficulty.hidden = !data.difficulty;
+  difficulty.textContent = data.difficulty || '';
+  element('objective').textContent = data.objective;
+  element('instruction').textContent = data.instruction;
   [...element('level-nav').children].forEach((button, index) => {
     const active = index === levelIndex;
     button.classList.toggle('is-active', active);
@@ -181,6 +212,7 @@ function renderLevel() {
   renderBoard();
   renderPieces();
   renderCursor();
+  tutorial.setLevel(levelIndex);
 }
 
 function goTo(index) {
@@ -212,7 +244,7 @@ function completeRound() {
 
 function showWin() {
   const allClear = rounds.every((round, index) => loadedCount(round) === LEVELS[index].pieces.length);
-  element('win-title').textContent = allClear ? '五关全部装好！' : '车门关上了！';
+  element('win-title').textContent = allClear ? `${LEVELS.length} 关全部装好！` : '车门关上了！';
   element('win-text').textContent = allClear ? '最后一件也有了自己的位置。' : `第 ${levelIndex + 1} 关 · ${level().name}`;
   const order = [...LEVELS.keys()].map((_, offset) => (levelIndex + offset + 1) % LEVELS.length);
   const next = order.find((index) => loadedCount(rounds[index]) < LEVELS[index].pieces.length);
@@ -246,6 +278,8 @@ function commit(id, placement, effect = 'place') {
   setStatus();
   renderPieces();
   gameAudio.play(effect);
+  if (effect === 'rotate') tutorial.advance('rotate');
+  if (before.x === null && placement.x !== null) tutorial.advance('place');
   const solved = loadedCount(round) === level().pieces.length;
   element('level-nav').children[levelIndex].classList.toggle('is-complete', solved);
   if (solved && !wasSolved) completeRound();
@@ -266,9 +300,9 @@ function rotate() {
   const id = current().selected;
   if (!id || drag || winTimer !== null) return;
   const before = current().states[id];
+  if (before.x !== null) return;
   const placement = { ...before, rotation: (before.rotation + 1) % 4 };
-  if (before.x === null) commit(id, placement, 'rotate');
-  else tryPlacement(pieceById(id), placement, 'rotate');
+  commit(id, placement, 'rotate');
 }
 
 function undo() {
@@ -280,6 +314,7 @@ function undo() {
   setStatus('已撤回上一步。');
   gameAudio.play('undo');
   renderPieces();
+  tutorial.advance('undo');
   element('level-nav').children[levelIndex].classList.toggle('is-complete', loadedCount(round) === level().pieces.length);
 }
 
@@ -288,16 +323,17 @@ function restart() {
   gameAudio.play('reset');
   rounds[levelIndex] = freshRound(level());
   goTo(levelIndex);
+  tutorial.advance('reset');
 }
 
 function candidateAt(event, action) {
   const bounds = grid.getBoundingClientRect();
-  const unit = bounds.width / SIZE;
+  const { width, height } = boardSize(level());
   const inside = event.clientX >= bounds.left && event.clientX <= bounds.right
     && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
   if (!inside) return null;
-  const x = Math.round((event.clientX - bounds.left) / unit - action.grabX);
-  const y = Math.round((event.clientY - bounds.top) / unit - action.grabY);
+  const x = Math.round((event.clientX - bounds.left) / bounds.width * width - action.grabX);
+  const y = Math.round((event.clientY - bounds.top) / bounds.height * height - action.grabY);
   return { x, y, rotation: action.rotation };
 }
 
@@ -422,10 +458,10 @@ function placeAt(x, y) {
 
 function gridPoint(event) {
   const bounds = grid.getBoundingClientRect();
-  const unit = bounds.width / SIZE;
+  const { width, height } = boardSize(level());
   return [
-    Math.floor((event.clientX - bounds.left) / unit),
-    Math.floor((event.clientY - bounds.top) / unit),
+    Math.floor((event.clientX - bounds.left) / bounds.width * width),
+    Math.floor((event.clientY - bounds.top) / bounds.height * height),
   ];
 }
 
@@ -462,8 +498,9 @@ grid.addEventListener('keydown', (event) => {
   const direction = boardKeys[event.key];
   if (direction) {
     event.preventDefault();
-    cursor.x = Math.min(SIZE - 1, Math.max(0, cursor.x + direction[0]));
-    cursor.y = Math.min(SIZE - 1, Math.max(0, cursor.y + direction[1]));
+    const { width, height } = boardSize(level());
+    cursor.x = Math.min(width - 1, Math.max(0, cursor.x + direction[0]));
+    cursor.y = Math.min(height - 1, Math.max(0, cursor.y + direction[1]));
     renderCursor();
   } else if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
