@@ -802,6 +802,7 @@ body.is-camping {
 .is-camping .win { background: #fff3d8; }
 
 /* Cover the grid and leave the car-door marker outside the moving panel. */
+.is-closing #grid { overflow: hidden; }
 #camp-hatch {
   position: absolute;
   inset: 0;
