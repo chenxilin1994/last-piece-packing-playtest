@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f0df">
   <title>最后一件装得下吗</title>
-  <link rel="stylesheet" href="./styles.css?v=assist-7">
-  <script type="module" src="./game.mjs?v=assist-7"></script>
+  <link rel="stylesheet" href="./styles.css?v=quota-8">
+  <script type="module" src="./game.mjs?v=quota-8"></script>
 </head>
 <body>
   <div class="camp-landscape" aria-hidden="true">
@@ -89,11 +89,13 @@
         <button type="button" id="restart" class="action">
           <span class="action-icon icon-restart" aria-hidden="true"></span><span>重开</span>
         </button>
-        <button type="button" id="hint" class="action assistance-action">
+        <button type="button" id="hint" class="action assistance-action" aria-label="提示，剩余 3 次">
           <span class="action-icon icon-hint" aria-hidden="true"></span><span>提示</span>
+          <span id="hint-remaining" class="uses-left" aria-hidden="true">3 次</span>
         </button>
-        <button type="button" id="auto-place" class="action assistance-action">
+        <button type="button" id="auto-place" class="action assistance-action" aria-label="自动摆放，剩余 2 次">
           <span class="action-icon icon-auto-place" aria-hidden="true"></span><span>自动摆放</span>
+          <span id="auto-remaining" class="uses-left" aria-hidden="true">2 次</span>
         </button>
       </div>
       <div class="play-feedback">

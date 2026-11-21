@@ -450,6 +450,19 @@ h1, h2, p { margin: 0; }
   background: #ead9a3;
   box-shadow: none;
 }
+.uses-left {
+  flex: none;
+  min-width: 26px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: #fff6d8;
+  color: #594421;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.assistance-action:disabled .uses-left { background: #dedacf; color: inherit; }
 .action-icon { flex: none; display: block; position: relative; width: 15px; height: 15px; }
 .icon-rotate::before, .icon-restart::before {
   content: "";

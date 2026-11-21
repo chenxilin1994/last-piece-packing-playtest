@@ -15,6 +15,12 @@ const campHatch = element('camp-hatch');
 const gameAudio = createGameAudio(element('camp-sound'));
 const tutorial = createTutorial();
 const CAMPING_LEVEL = 2;
+const ASSIST_BUDGET_KEY = 'last-piece-assist-budget-v1';
+const assistControls = {
+  hint: { button: element('hint'), remaining: element('hint-remaining'), label: '提示' },
+  auto: { button: element('auto-place'), remaining: element('auto-remaining'), label: '自动摆放' },
+};
+const assistBudget = { hint: 3, auto: 2 };
 const boardKeys = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
 function freshRound(level) {
@@ -33,6 +39,7 @@ let drag = null;
 let tapPreview = null;
 let winTimer = null;
 let suggestion = null;
+let levelVisit = 0;
 let cursor = { x: 0, y: 0 };
 const isCamping = () => levelIndex === CAMPING_LEVEL;
 const current = () => rounds[levelIndex];
@@ -173,6 +180,33 @@ function renderAssist(unit) {
   }
 }
 
+function syncAssistBudget(serialized) {
+  try {
+    const saved = JSON.parse(serialized ?? localStorage.getItem(ASSIST_BUDGET_KEY));
+    for (const kind of Object.keys(assistControls)) {
+      const remaining = saved?.[kind];
+      if (Number.isInteger(remaining) && remaining >= 0) {
+        assistBudget[kind] = Math.min(assistBudget[kind], remaining);
+      }
+    }
+  } catch {}
+}
+
+function renderAssistControls() {
+  const complete = loadedCount(current()) === level().pieces.length;
+  for (const [kind, { button, remaining, label }] of Object.entries(assistControls)) {
+    const count = assistBudget[kind];
+    button.disabled = complete || count === 0;
+    button.setAttribute('aria-label', `${label}，剩余 ${count} 次`);
+    remaining.textContent = `${count} 次`;
+  }
+}
+
+function spendAssist(kind) {
+  assistBudget[kind] -= 1;
+  try { localStorage.setItem(ASSIST_BUDGET_KEY, JSON.stringify(assistBudget)); } catch {}
+}
+
 function renderPieces() {
   const { states, selected } = current();
   const unit = cellSize();
@@ -221,8 +255,7 @@ function renderPieces() {
   const loaded = loadedCount(current());
   element('progress').textContent = `${loaded} / ${pieces.length} 件已装`;
   element('undo').disabled = current().history.length === 0;
-  element('hint').disabled = loaded === pieces.length;
-  element('auto-place').disabled = loaded === pieces.length;
+  renderAssistControls();
   const selectedOnBoard = selected && states[selected].x !== null;
   const rotateButton = element('rotate');
   rotateButton.disabled = !selected || selectedOnBoard;
@@ -268,6 +301,7 @@ function renderLevel() {
 }
 
 function goTo(index) {
+  levelVisit += 1;
   if (drag) releaseDrag();
   clearTimeout(winTimer);
   winTimer = null;
@@ -351,27 +385,56 @@ function tryPlacement(piece, candidate, effect) {
   return true;
 }
 
-function requestAssist(autoPlace) {
+function applyAssist(kind) {
+  syncAssistBudget();
+  renderAssistControls();
+  if (assistBudget[kind] === 0) return;
   const round = current();
-  if (drag || winTimer !== null || win.open || loadedCount(round) === level().pieces.length) return;
   const move = suggestion ?? suggestMove(level(), round.states, round.selected);
   tutorial.advance('hint');
   setStatus();
+  if (kind === 'auto') {
+    const piece = move?.type === 'place' ? pieceById(move.id) : null;
+    if (!piece || round.states[piece.id].x !== null || placementError(level(), round.states, piece, move.placement)) {
+      setStatus('当前摆法卡住了，先撤回一步或把一件货拖回货架。', 'error');
+      return;
+    }
+    spendAssist(kind);
+    commit(piece.id, move.placement);
+    if (loadedCount(round) < level().pieces.length) setStatus(`已装入${piece.name}。`);
+    return;
+  }
   if (!move) {
     setStatus('暂时找不到下一步，可以撤回或重开。', 'error');
     return;
   }
-  if (autoPlace && move.type === 'place') {
-    const piece = pieceById(move.id);
-    if (round.states[move.id].x === null && tryPlacement(piece, move.placement)
-        && loadedCount(round) < level().pieces.length) {
-      setStatus(`已装入${piece.name}。`);
-    }
-    return;
-  }
+  spendAssist(kind);
   suggestion = move;
   if (move.type === 'place') round.selected = move.id;
   renderPieces();
+}
+
+async function requestAssist(kind) {
+  const unavailable = () => drag || winTimer !== null || win.open || loadedCount(current()) === level().pieces.length;
+  if (unavailable() || assistBudget[kind] === 0) return;
+  const visit = levelVisit;
+  const perform = () => {
+    if (visit === levelVisit && !unavailable()) applyAssist(kind);
+  };
+  if (!navigator.locks?.request) {
+    perform();
+    return;
+  }
+  let acquired = false;
+  try {
+    await navigator.locks.request(ASSIST_BUDGET_KEY, () => {
+      acquired = true;
+      perform();
+    });
+  } catch (error) {
+    if (acquired) throw error;
+    perform();
+  }
 }
 
 function rotate() {
@@ -591,8 +654,8 @@ grid.addEventListener('keydown', (event) => {
 grid.tabIndex = 0;
 element('rotate').addEventListener('click', rotate);
 element('undo').addEventListener('click', undo);
-element('hint').addEventListener('click', () => requestAssist(false));
-element('auto-place').addEventListener('click', () => requestAssist(true));
+assistControls.hint.button.addEventListener('click', () => requestAssist('hint'));
+assistControls.auto.button.addEventListener('click', () => requestAssist('auto'));
 element('restart').addEventListener('click', restart);
 element('replay').addEventListener('click', restart);
 element('tutorial-open').addEventListener('click', () => {
@@ -602,11 +665,17 @@ element('tutorial-open').addEventListener('click', () => {
 });
 campHatch.addEventListener('animationend', finishClosing);
 win.addEventListener('close', () => document.body.classList.remove('is-closing'));
+window.addEventListener('storage', (event) => {
+  if (event.key !== ASSIST_BUDGET_KEY) return;
+  syncAssistBudget(event.newValue);
+  renderAssistControls();
+});
 const resize = new ResizeObserver(() => {
   if (!drag) renderPieces();
 });
 resize.observe(grid);
 resize.observe(tray);
 
+syncAssistBudget();
 renderNav();
 renderLevel();
