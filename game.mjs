@@ -1,8 +1,9 @@
 import { cargoIllustration } from './camping-art.mjs?v=gear-4';
 import { createGameAudio } from './camping-audio.mjs?v=settings-6';
 import { LEVELS } from './levels.mjs?v=guide-6';
-import { boardSize, placementError, shape } from './packing.mjs?v=guide-6';
-import { createTutorial } from './tutorial.mjs?v=guide-6';
+import { suggestMove } from './packing-assist.mjs?v=assist-7';
+import { boardSize, footprint, placementError, shape } from './packing.mjs?v=guide-6';
+import { createTutorial } from './tutorial.mjs?v=assist-7';
 
 const element = (id) => document.getElementById(id);
 const grid = element('grid');
@@ -31,6 +32,7 @@ let levelIndex = Number.isInteger(requestedLevel) && requestedLevel >= 1 && requ
 let drag = null;
 let tapPreview = null;
 let winTimer = null;
+let suggestion = null;
 let cursor = { x: 0, y: 0 };
 const isCamping = () => levelIndex === CAMPING_LEVEL;
 const current = () => rounds[levelIndex];
@@ -129,6 +131,48 @@ function renderBoard() {
   }
 }
 
+function renderAssist(unit) {
+  const targets = element('assist-targets');
+  const message = element('assist-message');
+  targets.replaceChildren();
+  message.hidden = !suggestion;
+  if (!suggestion) {
+    message.textContent = '';
+    delete message.dataset.kind;
+    delete message.dataset.side;
+    return;
+  }
+  const { id, type } = suggestion;
+  const piece = pieceById(id);
+  const state = current().states[id];
+  const returning = type === 'return';
+  const placement = returning ? state : suggestion.placement;
+  const cells = footprint(piece, placement);
+  for (const [index, [x, y]] of cells.entries()) {
+    const tile = make('span', 'assist-cell');
+    tile.classList.toggle('is-return', returning);
+    tile.classList.toggle('is-anchor', !returning && index === 0);
+    tile.dataset.x = x;
+    tile.dataset.y = y;
+    tile.style.left = `${x * unit}px`;
+    tile.style.top = `${y * unit}px`;
+    tile.style.width = `${unit}px`;
+    tile.style.height = `${unit}px`;
+    targets.append(tile);
+  }
+  const rows = cells.map(([, y]) => y);
+  const targetMiddle = (Math.min(...rows) + Math.max(...rows) + 1) / 2;
+  message.dataset.side = targetMiddle <= boardSize(level()).height / 2 ? 'bottom' : 'top';
+  message.dataset.kind = type;
+  if (returning) {
+    message.textContent = `先把${piece.name}拖回货架，再试试提示。`;
+  } else {
+    const turns = (placement.rotation - state.rotation + 4) % 4;
+    const direction = turns ? `再旋转 ${turns} 次` : '方向已对';
+    message.textContent = `「${piece.name}」${direction}，把圆点对准亮圈。`;
+  }
+}
+
 function renderPieces() {
   const { states, selected } = current();
   const unit = cellSize();
@@ -146,7 +190,9 @@ function renderPieces() {
     const state = states[piece.id];
     const selectedHere = selected === piece.id;
     const onBoard = state.x !== null;
+    const recommended = suggestion?.id === piece.id;
     const slot = make('button', `tray-slot${selectedHere ? ' is-selected' : ''}${onBoard ? ' is-placed' : ''}`);
+    slot.classList.toggle('is-recommended', recommended && !onBoard);
     slot.type = 'button';
     slot.dataset.piece = piece.id;
     slot.setAttribute('aria-pressed', selectedHere);
@@ -163,6 +209,7 @@ function renderPieces() {
 
     if (onBoard) {
       const crate = drawCrate(piece, state.rotation, unit, selectedHere ? 'is-selected' : '');
+      crate.classList.toggle('is-recommended', recommended);
       crate.dataset.x = state.x;
       crate.dataset.y = state.y;
       crate.style.left = `${state.x * unit}px`;
@@ -171,14 +218,19 @@ function renderPieces() {
       placed.append(crate);
     }
   }
-  element('progress').textContent = `${loadedCount(current())} / ${pieces.length} 件已装`;
+  const loaded = loadedCount(current());
+  element('progress').textContent = `${loaded} / ${pieces.length} 件已装`;
   element('undo').disabled = current().history.length === 0;
+  element('hint').disabled = loaded === pieces.length;
+  element('auto-place').disabled = loaded === pieces.length;
   const selectedOnBoard = selected && states[selected].x !== null;
   const rotateButton = element('rotate');
   rotateButton.disabled = !selected || selectedOnBoard;
   element('rotation-help').hidden = !selectedOnBoard;
   if (selectedOnBoard) rotateButton.setAttribute('aria-describedby', 'rotation-help');
   else rotateButton.removeAttribute('aria-describedby');
+  renderAssist(unit);
+  tutorial.update({ level: level(), states, selected, unit });
 }
 
 function renderCursor() {
@@ -210,9 +262,9 @@ function renderLevel() {
     else button.removeAttribute('aria-current');
   });
   renderBoard();
-  renderPieces();
   renderCursor();
   tutorial.setLevel(levelIndex);
+  renderPieces();
 }
 
 function goTo(index) {
@@ -222,6 +274,7 @@ function goTo(index) {
   document.body.classList.remove('is-closing');
   if (win.open) win.close();
   levelIndex = index;
+  suggestion = null;
   cursor = { x: 0, y: 0 };
   setStatus();
   renderLevel();
@@ -259,6 +312,7 @@ function showWin() {
 }
 
 function select(id) {
+  if (suggestion?.id !== id) suggestion = null;
   current().selected = id;
   setStatus();
   renderPieces();
@@ -275,6 +329,7 @@ function commit(id, placement, effect = 'place') {
   round.history.push({ id, before });
   round.states[id] = placement;
   round.selected = id;
+  if (effect !== 'rotate' || suggestion?.type !== 'place' || suggestion.id !== id) suggestion = null;
   setStatus();
   renderPieces();
   gameAudio.play(effect);
@@ -296,6 +351,29 @@ function tryPlacement(piece, candidate, effect) {
   return true;
 }
 
+function requestAssist(autoPlace) {
+  const round = current();
+  if (drag || winTimer !== null || win.open || loadedCount(round) === level().pieces.length) return;
+  const move = suggestion ?? suggestMove(level(), round.states, round.selected);
+  tutorial.advance('hint');
+  setStatus();
+  if (!move) {
+    setStatus('暂时找不到下一步，可以撤回或重开。', 'error');
+    return;
+  }
+  if (autoPlace && move.type === 'place') {
+    const piece = pieceById(move.id);
+    if (round.states[move.id].x === null && tryPlacement(piece, move.placement)
+        && loadedCount(round) < level().pieces.length) {
+      setStatus(`已装入${piece.name}。`);
+    }
+    return;
+  }
+  suggestion = move;
+  if (move.type === 'place') round.selected = move.id;
+  renderPieces();
+}
+
 function rotate() {
   const id = current().selected;
   if (!id || drag || winTimer !== null) return;
@@ -311,6 +389,7 @@ function undo() {
   const { id, before } = round.history.pop();
   round.states[id] = before;
   round.selected = id;
+  suggestion = null;
   setStatus('已撤回上一步。');
   gameAudio.play('undo');
   renderPieces();
@@ -483,18 +562,19 @@ tray.addEventListener('click', (event) => {
 
 grid.addEventListener('pointerdown', (event) => {
   if (drag || !event.isPrimary || event.button !== 0
-      || event.target.closest('[data-piece]')) return;
+      || event.target.closest('[data-piece], #tutorial')) return;
   clearTapPreview();
   const target = tapCandidate(...gridPoint(event));
   if (target) tapPreview = drawDropPreview(target.piece, target.candidate, cellSize());
 });
 grid.addEventListener('pointercancel', clearTapPreview);
 grid.addEventListener('click', (event) => {
-  if (event.target.closest('[data-piece]') || event.detail === 0) return;
+  if (event.target.closest('[data-piece], #tutorial') || event.detail === 0) return;
   placeAt(...gridPoint(event));
 });
 
 grid.addEventListener('keydown', (event) => {
+  if (event.target !== grid) return;
   const direction = boardKeys[event.key];
   if (direction) {
     event.preventDefault();
@@ -511,8 +591,15 @@ grid.addEventListener('keydown', (event) => {
 grid.tabIndex = 0;
 element('rotate').addEventListener('click', rotate);
 element('undo').addEventListener('click', undo);
+element('hint').addEventListener('click', () => requestAssist(false));
+element('auto-place').addEventListener('click', () => requestAssist(true));
 element('restart').addEventListener('click', restart);
 element('replay').addEventListener('click', restart);
+element('tutorial-open').addEventListener('click', () => {
+  if (!suggestion) return;
+  suggestion = null;
+  renderPieces();
+});
 campHatch.addEventListener('animationend', finishClosing);
 win.addEventListener('close', () => document.body.classList.remove('is-closing'));
 const resize = new ResizeObserver(() => {

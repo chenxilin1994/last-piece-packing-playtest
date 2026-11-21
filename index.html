@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f0df">
   <title>最后一件装得下吗</title>
-  <link rel="stylesheet" href="./styles.css?v=guide-6">
-  <script type="module" src="./game.mjs?v=guide-6"></script>
+  <link rel="stylesheet" href="./styles.css?v=assist-7">
+  <script type="module" src="./game.mjs?v=assist-7"></script>
 </head>
 <body>
   <div class="camp-landscape" aria-hidden="true">
@@ -29,26 +29,14 @@
     <nav id="level-nav" class="level-nav" aria-label="选择关卡"></nav>
 
     <div class="game-layout">
-      <div class="stage-brief">
-        <section class="mission" aria-labelledby="level-title">
-          <div class="mission-reference" aria-hidden="true"></div>
-          <div class="mission-copy">
-            <div class="mission-heading"><h2 id="level-title"></h2><span id="difficulty" hidden></span></div>
-            <p id="objective"></p>
-          </div>
-          <p id="progress" class="progress"></p>
-        </section>
-        <section id="tutorial" class="tutorial" aria-label="新手引导" hidden>
-          <div class="tutorial-copy" aria-live="polite">
-            <div class="tutorial-heading"><span>新手引导</span><span id="tutorial-progress"></span></div>
-            <p><strong id="tutorial-title"></strong> <span id="tutorial-text"></span></p>
-          </div>
-          <div class="tutorial-actions">
-            <button type="button" id="tutorial-next">下一步</button>
-            <button type="button" id="tutorial-skip">跳过</button>
-          </div>
-        </section>
-      </div>
+      <section class="mission" aria-labelledby="level-title">
+        <div class="mission-reference" aria-hidden="true"></div>
+        <div class="mission-copy">
+          <div class="mission-heading"><h2 id="level-title"></h2><span id="difficulty" hidden></span></div>
+          <p id="objective"></p>
+        </div>
+        <p id="progress" class="progress"></p>
+      </section>
 
       <section class="load-bed" aria-labelledby="vehicle-label">
         <div class="load-bed-head">
@@ -58,13 +46,26 @@
         <div class="load-bed-frame">
           <div id="grid" aria-label="装箱区" aria-describedby="instruction">
             <div id="cells"></div>
+            <div id="tutorial-targets" class="board-targets" aria-hidden="true"></div>
             <div id="placed"></div>
+            <div id="assist-targets" class="board-targets" aria-hidden="true"></div>
+            <section id="tutorial" class="tutorial" aria-label="新手引导" hidden>
+              <div class="tutorial-copy" aria-live="polite">
+                <div class="tutorial-heading"><span>新手引导</span><span id="tutorial-progress"></span></div>
+                <p><strong id="tutorial-title"></strong><span id="tutorial-text"></span></p>
+              </div>
+              <div class="tutorial-actions">
+                <button type="button" id="tutorial-next">下一步</button>
+                <button type="button" id="tutorial-skip">跳过</button>
+              </div>
+            </section>
             <div id="camp-hatch" aria-hidden="true">
               <div class="hatch-window"></div>
               <div class="hatch-handle"></div>
             </div>
           </div>
           <div class="door-indicator">车门</div>
+          <p id="assist-message" class="assist-message" role="status" aria-live="polite" hidden></p>
         </div>
         <div class="load-bed-tail" aria-hidden="true"><i></i><i></i></div>
       </section>
@@ -87,6 +88,12 @@
         </button>
         <button type="button" id="restart" class="action">
           <span class="action-icon icon-restart" aria-hidden="true"></span><span>重开</span>
+        </button>
+        <button type="button" id="hint" class="action assistance-action">
+          <span class="action-icon icon-hint" aria-hidden="true"></span><span>提示</span>
+        </button>
+        <button type="button" id="auto-place" class="action assistance-action">
+          <span class="action-icon icon-auto-place" aria-hidden="true"></span><span>自动摆放</span>
         </button>
       </div>
       <div class="play-feedback">
