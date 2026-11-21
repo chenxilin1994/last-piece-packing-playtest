@@ -1,6 +1,6 @@
-import { cargoArtCenter, cargoIllustration, trayIllustration } from './camping-art.mjs?v=camping-2';
+import { cargoIllustration } from './camping-art.mjs?v=camping-3';
 import { createCampingAudio } from './camping-audio.mjs';
-import { LEVELS } from './levels.mjs?v=camping-1';
+import { LEVELS } from './levels.mjs?v=camping-3';
 import { SIZE, placementError, shape } from './packing.mjs';
 
 const element = (id) => document.getElementById(id);
@@ -53,38 +53,34 @@ function drawCrate(piece, rotation, unit, className = '') {
   const crate = make('div', `crate ${piece.color} ${className}`);
   const camping = isCamping();
   const preview = crate.classList.contains('preview');
+  const illustrationOnly = camping && (crate.classList.contains('is-dragging') || crate.classList.contains('miniature'));
   if (camping) crate.classList.add('camping-crate');
   crate.dataset.piece = piece.id;
   crate.dataset.rotation = rotation;
   crate.style.width = `${geometry.width * unit}px`;
   crate.style.height = `${geometry.height * unit}px`;
-  if (camping && crate.classList.contains('is-dragging')) {
-    crate.append(cargoIllustration(piece, rotation, unit, geometry));
-    return crate;
-  }
-  const outline = new Set(geometry.cells.map(([x, y]) => `${x},${y}`));
-  // Round only exposed corners so irregular pieces read as one object.
-  for (const [x, y] of geometry.cells) {
-    const tile = make('span', 'cargo-cell');
-    tile.style.left = `${x * unit}px`;
-    tile.style.top = `${y * unit}px`;
-    tile.style.width = `${unit}px`;
-    tile.style.height = `${unit}px`;
-    const left = outline.has(`${x - 1},${y}`);
-    const right = outline.has(`${x + 1},${y}`);
-    const above = outline.has(`${x},${y - 1}`);
-    const below = outline.has(`${x},${y + 1}`);
-    const radius = `${Math.max(2, Math.min(9, unit * 0.16))}px`;
-    tile.style.borderRadius = [!left && !above, !right && !above, !right && !below, !left && !below]
-      .map((corner) => corner ? radius : '0').join(' ');
-    if (camping && !preview) {
-      tile.style.borderWidth = [above, right, below, left].map((joined) => joined ? '0' : '1px').join(' ');
+  if (!illustrationOnly) {
+    const outline = new Set(geometry.cells.map(([x, y]) => `${x},${y}`));
+    // Round only corners on the outside perimeter.
+    for (const [x, y] of geometry.cells) {
+      const tile = make('span', 'cargo-cell');
+      tile.style.left = `${x * unit}px`;
+      tile.style.top = `${y * unit}px`;
+      tile.style.width = `${unit}px`;
+      tile.style.height = `${unit}px`;
+      const left = outline.has(`${x - 1},${y}`);
+      const right = outline.has(`${x + 1},${y}`);
+      const above = outline.has(`${x},${y - 1}`);
+      const below = outline.has(`${x},${y + 1}`);
+      const radius = `${Math.max(2, Math.min(9, unit * 0.16))}px`;
+      tile.style.borderRadius = [!left && !above, !right && !above, !right && !below, !left && !below]
+        .map((corner) => corner ? radius : '0').join(' ');
+      crate.append(tile);
     }
-    crate.append(tile);
+    if (piece.door) crate.firstElementChild.classList.add('express');
   }
-  if (piece.door) crate.firstElementChild.classList.add('express');
-  if (camping && !preview && !crate.classList.contains('miniature')) {
-    crate.append(cargoIllustration(piece, rotation, unit, geometry));
+  if (camping && !preview) {
+    crate.append(cargoIllustration(piece, rotation, unit));
   }
   if (camping && (crate.classList.contains('is-selected') || preview)) {
     const [[x, y]] = geometry.cells;
@@ -139,8 +135,7 @@ function renderPieces() {
     slot.setAttribute('aria-label', `${piece.name}${onBoard ? '，已装入' : ''}${piece.door ? '，先送的货' : ''}`);
     const preview = make('span', 'crate-preview');
     const camping = isCamping();
-    if (camping) preview.append(trayIllustration(piece.id, state.rotation));
-    const miniature = drawCrate(piece, state.rotation, camping ? 7 : 11,
+    const miniature = drawCrate(piece, state.rotation, camping ? 16 : 11,
       camping && selectedHere ? 'miniature is-selected' : 'miniature');
     preview.append(miniature);
     const name = make('span', 'piece-name');
@@ -321,16 +316,17 @@ function startDrag(event) {
   const state = current().states[id];
   const onBoard = placed.contains(source);
   const geometry = shape(piece.cells, state.rotation);
-  const fromMiniature = !onBoard && source.classList.contains('miniature');
+  const miniature = isCamping() ? source.querySelector('.miniature') : null;
+  const bounds = (miniature ?? source).getBoundingClientRect();
+  const fromMiniature = event.clientX >= bounds.left && event.clientX <= bounds.right
+    && event.clientY >= bounds.top && event.clientY <= bounds.bottom
+    && (miniature !== null || source.classList.contains('miniature'));
   let grab = { x: geometry.width / 2, y: geometry.height / 2 };
   if (onBoard || fromMiniature) {
-    const rect = source.getBoundingClientRect();
     grab = {
-      x: (event.clientX - rect.left) / rect.width * geometry.width,
-      y: (event.clientY - rect.top) / rect.height * geometry.height,
+      x: (event.clientX - bounds.left) / bounds.width * geometry.width,
+      y: (event.clientY - bounds.top) / bounds.height * geometry.height,
     };
-  } else if (isCamping()) {
-    grab = cargoArtCenter(piece, state.rotation, geometry);
   }
   drag = {
     pointerId: event.pointerId,

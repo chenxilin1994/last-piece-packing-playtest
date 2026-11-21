@@ -801,39 +801,18 @@ body.is-camping {
   box-shadow: inset 0 0 0 1px #49714a;
   background: #e4ecd3;
 }
-.is-camping .crate-preview { height: 42px; min-height: 42px; }
-.camp-tray-paint {
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 0 2px 3px;
-  object-fit: contain;
-  pointer-events: none;
-}
-.crate-preview:has(.camp-tray-paint) .miniature {
-  left: auto;
-  top: auto;
-  right: 0;
-  bottom: 0;
-  transform: none;
-}
-.tray-slot:not(.is-selected) .crate-preview:has(.camp-tray-paint) .miniature { visibility: hidden; }
+.is-camping .crate-preview { height: 50px; }
 .is-camping .action { background: #fcf3db; border-color: #36523c; box-shadow: 0 2px 0 #36523c; }
 .is-camping .action-primary { background: #eabd6f; }
 .is-camping .action:disabled { background: #e6e3ca; color: #646d56; border-color: #9ca385; box-shadow: none; }
 .is-camping .action:active:not(:disabled) { box-shadow: none; background: #e7d3a6; }
 .is-camping .win { background: #fff3d8; }
 
-/* Floor markings show occupied tiles. The same artwork is used on each surface. */
+/* Settled equipment is drawn by its sprite. Only a candidate drop marks the floor. */
 .crate.camping-crate .cargo-cell {
-  background: color-mix(in srgb,var(--cargo) 33%,transparent);
+  background: transparent;
   box-shadow: none;
 }
-.crate.camping-crate:not(.preview) .cargo-cell {
-  border-style: dashed;
-  border-color: color-mix(in srgb,var(--cargo-dark) 70%,transparent);
-}
-.miniature.camping-crate .cargo-cell { background: var(--cargo); }
 .crate.camping-crate .cargo-cell::before,
 .crate.camping-crate .cargo-cell::after { display: none; }
 .crate.camping-crate.is-dragging {
@@ -843,6 +822,8 @@ body.is-camping {
 .crate.camping-crate .cargo-art {
   display: block;
   position: absolute;
+  left: 50%;
+  top: 50%;
   object-fit: contain;
   pointer-events: none;
 }
