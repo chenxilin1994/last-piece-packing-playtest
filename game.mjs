@@ -1,15 +1,17 @@
 import { cargoIllustration } from './camping-art.mjs?v=gear-4';
 import { createGameAudio } from './camping-audio.mjs?v=settings-6';
-import { LEVELS } from './levels.mjs?v=guide-6';
+import { CHAPTERS, LEVELS } from './levels.mjs?v=chapter-9';
 import { suggestMove } from './packing-assist.mjs?v=assist-7';
 import { boardSize, footprint, placementError, shape } from './packing.mjs?v=guide-6';
-import { createTutorial } from './tutorial.mjs?v=assist-7';
+import { createTutorial } from './tutorial.mjs?v=chapter-9';
 
 const element = (id) => document.getElementById(id);
 const grid = element('grid');
 const placed = element('placed');
 const tray = element('tray');
 const win = element('win');
+const levelChooser = element('level-chooser');
+const chapterSelect = element('chapter-select');
 const status = element('status');
 const campHatch = element('camp-hatch');
 const gameAudio = createGameAudio(element('camp-sound'));
@@ -41,7 +43,7 @@ let winTimer = null;
 let suggestion = null;
 let levelVisit = 0;
 let cursor = { x: 0, y: 0 };
-const isCamping = () => levelIndex === CAMPING_LEVEL;
+const isCamping = () => levelIndex === CAMPING_LEVEL || level().theme === 'camping';
 const current = () => rounds[levelIndex];
 const level = () => LEVELS[levelIndex];
 const pieceById = (id) => level().pieces.find((piece) => piece.id === id);
@@ -106,14 +108,44 @@ function drawCrate(piece, rotation, unit, className = '') {
 
 function renderNav() {
   const container = element('level-nav');
+  for (const [index, { name, start, end }] of CHAPTERS.entries()) {
+    const option = make('option');
+    option.value = String(index);
+    option.textContent = `${name} · ${start + 1}–${end} 关`;
+    chapterSelect.append(option);
+  }
   for (const [index, data] of LEVELS.entries()) {
-    const button = make('button', 'level-tab');
+    const button = make('button', 'level-tab level-tile');
     button.type = 'button';
-    button.textContent = index + 1;
-    button.setAttribute('aria-label', `第 ${index + 1} 关：${data.name}`);
+    const number = make('span', 'level-tile-number');
+    const title = make('span', 'level-tile-title');
+    number.textContent = String(index + 1);
+    title.textContent = data.name;
+    button.append(number, title);
+    button.setAttribute('aria-label', `第 ${index + 1} 关 ${data.name}`);
     button.addEventListener('click', () => goTo(index));
     container.append(button);
   }
+  element('level-total').textContent = `/ ${LEVELS.length}`;
+}
+
+function renderChapter(chapterIndex) {
+  const { start, end } = CHAPTERS[chapterIndex];
+  const buttons = element('level-nav').children;
+  let complete = 0;
+  chapterSelect.value = String(chapterIndex);
+  for (let index = 0; index < LEVELS.length; index += 1) {
+    const inChapter = index >= start && index < end;
+    const done = loadedCount(rounds[index]) === LEVELS[index].pieces.length;
+    buttons[index].hidden = !inChapter;
+    buttons[index].classList.toggle('is-complete', done);
+    if (inChapter && done) complete += 1;
+  }
+  element('chapter-progress').textContent = `已完成 ${complete}/${end - start}`;
+}
+
+function activeChapter() {
+  return CHAPTERS.findIndex(({ start, end }) => levelIndex >= start && levelIndex < end);
 }
 
 function renderBoard() {
@@ -279,7 +311,12 @@ function renderLevel() {
   const { width, height } = boardSize(data);
   document.body.classList.toggle('is-camping', isCamping());
   document.body.dataset.theme = data.theme || '';
+  document.body.dataset.level = String(levelIndex + 1);
+  document.body.toggleAttribute('data-dense-cargo', data.pieces.length >= 8);
   element('level-title').textContent = data.name;
+  element('level-number').textContent = `第 ${levelIndex + 1} 关`;
+  element('previous-stage').disabled = levelIndex === 0;
+  element('next-stage').disabled = levelIndex === LEVELS.length - 1;
   element('vehicle-label').textContent = data.vehicle || '后备厢';
   element('board-size').textContent = `${width} × ${height}`;
   const difficulty = element('difficulty');
@@ -290,10 +327,10 @@ function renderLevel() {
   [...element('level-nav').children].forEach((button, index) => {
     const active = index === levelIndex;
     button.classList.toggle('is-active', active);
-    button.classList.toggle('is-complete', loadedCount(rounds[index]) === LEVELS[index].pieces.length);
     if (active) button.setAttribute('aria-current', 'step');
     else button.removeAttribute('aria-current');
   });
+  renderChapter(activeChapter());
   renderBoard();
   renderCursor();
   tutorial.setLevel(levelIndex);
@@ -301,11 +338,13 @@ function renderLevel() {
 }
 
 function goTo(index) {
+  if (!LEVELS[index]) return;
   levelVisit += 1;
   if (drag) releaseDrag();
   clearTimeout(winTimer);
   winTimer = null;
   document.body.classList.remove('is-closing');
+  if (levelChooser.open) levelChooser.close();
   if (win.open) win.close();
   levelIndex = index;
   suggestion = null;
@@ -415,7 +454,8 @@ function applyAssist(kind) {
 }
 
 async function requestAssist(kind) {
-  const unavailable = () => drag || winTimer !== null || win.open || loadedCount(current()) === level().pieces.length;
+  const unavailable = () => drag || winTimer !== null || win.open || levelChooser.open
+    || loadedCount(current()) === level().pieces.length;
   if (unavailable() || assistBudget[kind] === 0) return;
   const visit = levelVisit;
   const perform = () => {
@@ -652,6 +692,17 @@ grid.addEventListener('keydown', (event) => {
 });
 
 grid.tabIndex = 0;
+element('previous-stage').addEventListener('click', () => goTo(levelIndex - 1));
+element('next-stage').addEventListener('click', () => goTo(levelIndex + 1));
+element('open-level-chooser').addEventListener('click', () => {
+  if (drag || winTimer !== null) return;
+  renderChapter(activeChapter());
+  levelChooser.showModal();
+  element('open-level-chooser').setAttribute('aria-expanded', 'true');
+});
+element('close-level-chooser').addEventListener('click', () => levelChooser.close());
+levelChooser.addEventListener('close', () => element('open-level-chooser').setAttribute('aria-expanded', 'false'));
+chapterSelect.addEventListener('change', () => renderChapter(Number(chapterSelect.value)));
 element('rotate').addEventListener('click', rotate);
 element('undo').addEventListener('click', undo);
 assistControls.hint.button.addEventListener('click', () => requestAssist('hint'));

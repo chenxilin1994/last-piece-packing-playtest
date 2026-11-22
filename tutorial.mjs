@@ -10,7 +10,7 @@ const steps = [
   { title: '转个方向', text: '选中货架上的货物，按下方「旋转」转 90°。', action: 'rotate' },
   { title: '放下后还能移动', text: '再拖一件进亮框。想换方向，先把已装的货物拖回货架。红纹表示放不下。', action: 'place' },
   { title: '卡住时用道具', text: '「提示」标出货物和落点。「自动摆放」帮你装好一件，也能撤回。', action: 'hint' },
-  { title: '准备出发', text: '「重开」清空本关。右上角能调声音，上方数字能换关。货物装齐就关门。' },
+  { title: '准备出发', text: '「重开」清空本关。右上角能调声音，上方「选关」能换关。货物装齐就关门。' },
 ];
 
 export function createTutorial() {

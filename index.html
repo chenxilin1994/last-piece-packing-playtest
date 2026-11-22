@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f6f0df">
   <title>最后一件装得下吗</title>
-  <link rel="stylesheet" href="./styles.css?v=quota-8">
-  <script type="module" src="./game.mjs?v=quota-8"></script>
+  <link rel="stylesheet" href="./styles.css?v=chapter-9">
+  <script type="module" src="./game.mjs?v=chapter-9"></script>
 </head>
 <body>
   <div class="camp-landscape" aria-hidden="true">
@@ -26,7 +26,14 @@
       </button>
     </header>
 
-    <nav id="level-nav" class="level-nav" aria-label="选择关卡"></nav>
+    <nav class="level-nav" aria-label="关卡导航">
+      <button type="button" id="previous-stage" class="level-tab level-arrow" aria-label="上一关" disabled>‹</button>
+      <button type="button" id="open-level-chooser" class="level-tab level-picker" aria-haspopup="dialog"
+        aria-controls="level-chooser" aria-expanded="false">
+        <span id="level-number">第 1 关</span><span id="level-total"></span><span class="picker-label">选关</span>
+      </button>
+      <button type="button" id="next-stage" class="level-tab level-arrow" aria-label="下一关">›</button>
+    </nav>
 
     <div class="game-layout">
       <section class="mission" aria-labelledby="level-title">
@@ -112,6 +119,18 @@
       <button type="button" id="replay" class="action">再玩一次</button>
       <button type="button" id="next-level" class="action action-primary">下一关</button>
     </div>
+  </dialog>
+  <dialog id="level-chooser" class="level-chooser" aria-labelledby="level-chooser-title">
+    <div class="chooser-head">
+      <h2 id="level-chooser-title">选择关卡</h2>
+      <button type="button" id="close-level-chooser" class="chooser-close">返回</button>
+    </div>
+    <div class="chapter-bar">
+      <label for="chapter-select">章节</label>
+      <select id="chapter-select"></select>
+      <p id="chapter-progress" aria-live="polite"></p>
+    </div>
+    <nav id="level-nav" class="level-grid" aria-label="本章关卡"></nav>
   </dialog>
   <dialog id="sound-settings" class="sound-settings" aria-labelledby="sound-title">
     <h2 id="sound-title">声音设置</h2>
