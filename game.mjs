@@ -1,5 +1,6 @@
 import { cargoIllustration } from './camping-art.mjs?v=gear-4';
 import { createGameAudio } from './camping-audio.mjs?v=settings-6';
+import { createCampaignSave, freshRound } from './campaign-save.mjs?v=progress-10';
 import { CHAPTERS, LEVELS } from './levels.mjs?v=chapter-9';
 import { suggestMove } from './packing-assist.mjs?v=assist-7';
 import { boardSize, footprint, placementError, shape } from './packing.mjs?v=guide-6';
@@ -24,31 +25,56 @@ const assistControls = {
 };
 const assistBudget = { hint: 3, auto: 2 };
 const boardKeys = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+const campaignSave = createCampaignSave(LEVELS);
+let clearedCount = campaignSave.getClearedCount();
+const isUnlocked = (index) => Number.isInteger(index) && index >= 0 && index < LEVELS.length && index <= clearedCount;
+const frontier = () => Math.min(clearedCount, LEVELS.length - 1);
+const loadedCount = (round) => Object.values(round.states).filter(({ x }) => x !== null).length;
 
-function freshRound(level) {
-  return {
-    states: Object.fromEntries(level.pieces.map(({ id }) => [id, { x: null, y: null, rotation: 0 }])),
-    selected: level.pieces[0].id,
-    history: [],
-  };
+const savedLevel = campaignSave.getActiveLevel();
+const requested = Number(new URLSearchParams(location.search).get('level')) - 1;
+let levelIndex = isUnlocked(savedLevel) ? savedLevel : frontier();
+if (isUnlocked(requested)) levelIndex = requested;
+let { round: activeRound, suggestion } = loadSnapshot(levelIndex);
+if (loadedCount(activeRound) === LEVELS[levelIndex].pieces.length) {
+  if (levelIndex === clearedCount) clearedCount = campaignSave.markCleared(levelIndex);
+  if (levelIndex === savedLevel && clearedCount < LEVELS.length) {
+    levelIndex = frontier();
+    ({ round: activeRound, suggestion } = loadSnapshot(levelIndex));
+  } else if (levelIndex !== savedLevel) {
+    activeRound = freshRound(LEVELS[levelIndex]);
+    suggestion = null;
+    persistRound();
+  }
 }
-
-const rounds = LEVELS.map(freshRound);
-const requestedLevel = Number(new URLSearchParams(location.search).get('level'));
-let levelIndex = Number.isInteger(requestedLevel) && requestedLevel >= 1 && requestedLevel <= LEVELS.length
-  ? requestedLevel - 1 : 0;
 let drag = null;
 let tapPreview = null;
 let winTimer = null;
-let suggestion = null;
 let levelVisit = 0;
 let cursor = { x: 0, y: 0 };
 const isCamping = () => levelIndex === CAMPING_LEVEL || level().theme === 'camping';
-const current = () => rounds[levelIndex];
+const current = () => activeRound;
 const level = () => LEVELS[levelIndex];
 const pieceById = (id) => level().pieces.find((piece) => piece.id === id);
 const cellSize = () => grid.getBoundingClientRect().width / boardSize(level()).width;
-const loadedCount = (round) => Object.values(round.states).filter(({ x }) => x !== null).length;
+
+function loadSnapshot(index) {
+  return campaignSave.loadRound(index) ?? { round: freshRound(LEVELS[index]), suggestion: null };
+}
+
+function persistRound() {
+  campaignSave.saveRound(levelIndex, activeRound, suggestion);
+  campaignSave.saveActiveLevel(levelIndex);
+}
+
+function persistActiveLevel() {
+  campaignSave.saveActiveLevel(levelIndex);
+  const url = new URL(location.href);
+  if (url.searchParams.has('level') && url.searchParams.get('level') !== String(levelIndex + 1)) {
+    url.searchParams.set('level', String(levelIndex + 1));
+    history.replaceState(history.state, '', url);
+  }
+}
 
 function make(tag, className = '') {
   const node = document.createElement(tag);
@@ -119,10 +145,10 @@ function renderNav() {
     button.type = 'button';
     const number = make('span', 'level-tile-number');
     const title = make('span', 'level-tile-title');
+    const state = make('span', 'level-tile-state');
     number.textContent = String(index + 1);
     title.textContent = data.name;
-    button.append(number, title);
-    button.setAttribute('aria-label', `第 ${index + 1} 关 ${data.name}`);
+    button.append(number, title, state);
     button.addEventListener('click', () => goTo(index));
     container.append(button);
   }
@@ -136,9 +162,16 @@ function renderChapter(chapterIndex) {
   chapterSelect.value = String(chapterIndex);
   for (let index = 0; index < LEVELS.length; index += 1) {
     const inChapter = index >= start && index < end;
-    const done = loadedCount(rounds[index]) === LEVELS[index].pieces.length;
-    buttons[index].hidden = !inChapter;
-    buttons[index].classList.toggle('is-complete', done);
+    const button = buttons[index];
+    const done = index < clearedCount;
+    const unlocked = isUnlocked(index);
+    const state = done ? '已通关' : unlocked ? '可挑战' : '待解锁';
+    button.hidden = !inChapter;
+    button.disabled = !unlocked;
+    button.classList.toggle('is-complete', done);
+    button.dataset.state = done ? 'completed' : unlocked ? 'available' : 'locked';
+    button.querySelector('.level-tile-state').textContent = state;
+    button.setAttribute('aria-label', `第 ${index + 1} 关 ${LEVELS[index].name}，${state}`);
     if (inChapter && done) complete += 1;
   }
   element('chapter-progress').textContent = `已完成 ${complete}/${end - start}`;
@@ -146,6 +179,16 @@ function renderChapter(chapterIndex) {
 
 function activeChapter() {
   return CHAPTERS.findIndex(({ start, end }) => levelIndex >= start && levelIndex < end);
+}
+
+function renderCampaignProgress(chapterIndex = activeChapter()) {
+  element('previous-stage').disabled = !isUnlocked(levelIndex - 1);
+  element('next-stage').disabled = !isUnlocked(levelIndex + 1);
+  renderChapter(chapterIndex);
+}
+
+function syncCampaignProgress() {
+  clearedCount = Math.max(clearedCount, campaignSave.getClearedCount());
 }
 
 function renderBoard() {
@@ -315,8 +358,6 @@ function renderLevel() {
   document.body.toggleAttribute('data-dense-cargo', data.pieces.length >= 8);
   element('level-title').textContent = data.name;
   element('level-number').textContent = `第 ${levelIndex + 1} 关`;
-  element('previous-stage').disabled = levelIndex === 0;
-  element('next-stage').disabled = levelIndex === LEVELS.length - 1;
   element('vehicle-label').textContent = data.vehicle || '后备厢';
   element('board-size').textContent = `${width} × ${height}`;
   const difficulty = element('difficulty');
@@ -330,15 +371,16 @@ function renderLevel() {
     if (active) button.setAttribute('aria-current', 'step');
     else button.removeAttribute('aria-current');
   });
-  renderChapter(activeChapter());
+  renderCampaignProgress();
   renderBoard();
   renderCursor();
   tutorial.setLevel(levelIndex);
   renderPieces();
 }
 
-function goTo(index) {
-  if (!LEVELS[index]) return;
+function goTo(index, restartRound = false) {
+  syncCampaignProgress();
+  if (!isUnlocked(index)) return;
   levelVisit += 1;
   if (drag) releaseDrag();
   clearTimeout(winTimer);
@@ -346,12 +388,19 @@ function goTo(index) {
   document.body.classList.remove('is-closing');
   if (levelChooser.open) levelChooser.close();
   if (win.open) win.close();
+  if (index !== levelIndex) ({ round: activeRound, suggestion } = loadSnapshot(index));
   levelIndex = index;
-  suggestion = null;
+  const wasSolved = loadedCount(activeRound) === level().pieces.length;
+  if (wasSolved && index === clearedCount) clearedCount = campaignSave.markCleared(index);
+  if (restartRound || (index < clearedCount && wasSolved)) {
+    activeRound = freshRound(level());
+    suggestion = null;
+    persistRound();
+  }
+  persistActiveLevel();
   cursor = { x: 0, y: 0 };
   setStatus();
   renderLevel();
-  if (loadedCount(current()) === level().pieces.length) showWin();
 }
 
 function finishClosing() {
@@ -368,25 +417,24 @@ function completeRound() {
   winTimer = setTimeout(finishClosing, 700);
 }
 
-function showWin() {
-  const allClear = rounds.every((round, index) => loadedCount(round) === LEVELS[index].pieces.length);
+function renderWin() {
+  const allClear = clearedCount === LEVELS.length;
   element('win-title').textContent = allClear ? `${LEVELS.length} 关全部装好！` : '车门关上了！';
   element('win-text').textContent = allClear ? '最后一件也有了自己的位置。' : `第 ${levelIndex + 1} 关 · ${level().name}`;
-  const order = [...LEVELS.keys()].map((_, offset) => (levelIndex + offset + 1) % LEVELS.length);
-  const next = order.find((index) => loadedCount(rounds[index]) < LEVELS[index].pieces.length);
   const nextButton = element('next-level');
-  nextButton.hidden = next === undefined;
-  if (next !== undefined) {
-    nextButton.textContent = next === levelIndex + 1 ? '下一关' : `去第 ${next + 1} 关`;
-    nextButton.onclick = () => goTo(next);
-  }
-  element('level-nav').children[levelIndex].classList.add('is-complete');
+  nextButton.hidden = allClear;
+  nextButton.textContent = clearedCount === levelIndex + 1 ? '下一关' : `去第 ${clearedCount + 1} 关`;
+}
+
+function showWin() {
+  renderWin();
   if (!win.open) win.showModal();
 }
 
 function select(id) {
   if (suggestion?.id !== id) suggestion = null;
   current().selected = id;
+  persistRound();
   setStatus();
   renderPieces();
 }
@@ -403,13 +451,17 @@ function commit(id, placement, effect = 'place') {
   round.states[id] = placement;
   round.selected = id;
   if (effect !== 'rotate' || suggestion?.type !== 'place' || suggestion.id !== id) suggestion = null;
+  persistRound();
+  const solved = loadedCount(round) === level().pieces.length;
+  if (solved && !wasSolved) {
+    clearedCount = Math.max(clearedCount, campaignSave.markCleared(levelIndex));
+    renderCampaignProgress();
+  }
   setStatus();
   renderPieces();
   gameAudio.play(effect);
   if (effect === 'rotate') tutorial.advance('rotate');
   if (before.x === null && placement.x !== null) tutorial.advance('place');
-  const solved = loadedCount(round) === level().pieces.length;
-  element('level-nav').children[levelIndex].classList.toggle('is-complete', solved);
   if (solved && !wasSolved) completeRound();
 }
 
@@ -450,6 +502,7 @@ function applyAssist(kind) {
   spendAssist(kind);
   suggestion = move;
   if (move.type === 'place') round.selected = move.id;
+  persistRound();
   renderPieces();
 }
 
@@ -493,18 +546,17 @@ function undo() {
   round.states[id] = before;
   round.selected = id;
   suggestion = null;
+  persistRound();
   setStatus('已撤回上一步。');
   gameAudio.play('undo');
   renderPieces();
   tutorial.advance('undo');
-  element('level-nav').children[levelIndex].classList.toggle('is-complete', loadedCount(round) === level().pieces.length);
 }
 
 function restart() {
   if (drag) return;
   gameAudio.play('reset');
-  rounds[levelIndex] = freshRound(level());
-  goTo(levelIndex);
+  goTo(levelIndex, true);
   tutorial.advance('reset');
 }
 
@@ -694,6 +746,10 @@ grid.addEventListener('keydown', (event) => {
 grid.tabIndex = 0;
 element('previous-stage').addEventListener('click', () => goTo(levelIndex - 1));
 element('next-stage').addEventListener('click', () => goTo(levelIndex + 1));
+element('next-level').addEventListener('click', () => {
+  syncCampaignProgress();
+  goTo(clearedCount);
+});
 element('open-level-chooser').addEventListener('click', () => {
   if (drag || winTimer !== null) return;
   renderChapter(activeChapter());
@@ -712,14 +768,20 @@ element('replay').addEventListener('click', restart);
 element('tutorial-open').addEventListener('click', () => {
   if (!suggestion) return;
   suggestion = null;
+  persistRound();
   renderPieces();
 });
 campHatch.addEventListener('animationend', finishClosing);
 win.addEventListener('close', () => document.body.classList.remove('is-closing'));
 window.addEventListener('storage', (event) => {
-  if (event.key !== ASSIST_BUDGET_KEY) return;
-  syncAssistBudget(event.newValue);
-  renderAssistControls();
+  if (event.key === ASSIST_BUDGET_KEY) {
+    syncAssistBudget(event.newValue);
+    renderAssistControls();
+  } else if (campaignSave.isCompletionKey(event.key)) {
+    syncCampaignProgress();
+    renderCampaignProgress(levelChooser.open ? Number(chapterSelect.value) : activeChapter());
+    if (win.open) renderWin();
+  }
 });
 const resize = new ResizeObserver(() => {
   if (!drag) renderPieces();
@@ -728,5 +790,7 @@ resize.observe(grid);
 resize.observe(tray);
 
 syncAssistBudget();
+persistActiveLevel();
 renderNav();
 renderLevel();
+if (clearedCount === LEVELS.length && loadedCount(current()) === level().pieces.length) showWin();
